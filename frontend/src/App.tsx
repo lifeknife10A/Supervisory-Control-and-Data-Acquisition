@@ -32,6 +32,17 @@ export function App() {
     return () => clearInterval(interval);
   }, [isSimulating, tickMCU]);
 
+  // Continuously sync 3D plant telemetry to local FastAPI / LabVIEW bridge
+  const telemetry = useWorkbenchStore((s) => s.telemetry);
+  useEffect(() => {
+    if (!isSimulating) return;
+    fetch('http://localhost:8000/api/telemetry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(telemetry),
+    }).catch(() => {});
+  }, [telemetry, isSimulating]);
+
   const selectedIds = useWorkbenchStore((s) => s.selectedComponentIds);
   const components = useWorkbenchStore((s) => s.components);
   const wires = useWorkbenchStore((s) => s.wires);
