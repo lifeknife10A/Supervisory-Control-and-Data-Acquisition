@@ -1,0 +1,45 @@
+# macOS System Files
+.DS_Store
+**/.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Node & Frontend Dependencies & Build Output
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.pnpm-store/
+
+# Python Environments & Cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+cad_env/
+**/cad_env/
+.venv/
+**/venv/
+env/
+**/env/
+
+# PlatformIO & Embedded Builds
+.pio/
+**/.pio/
+.pioenvs/
+.piolibdeps/
+
+# Logs & Temporary Files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.playwright-cli/
+.tempmediaStorage/
+
+# Local Environment Variables
+.env
+.env.local
+.env.*.local

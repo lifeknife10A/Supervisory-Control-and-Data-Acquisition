@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "author": "SCADA Lab 3D - Industrial Process Control Simulator",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "id": "esp",
+      "type": "wokwi-esp32-devkit-v1",
+      "top": 300,
+      "left": 400,
+      "attrs": {}
+    },
+
+    { "id": "us", "type": "wokwi-hc-sr04", "top": 20, "left": 20, "attrs": {} },
+
+    { "id": "ds18b20", "type": "wokwi-ds18b20", "top": 20, "left": 700, "attrs": {} },
+    { "id": "r_pullup", "type": "wokwi-resistor", "top": 130, "left": 700, "rotate": 90, "attrs": { "value": "4700" } },
+
+    { "id": "gas1", "type": "wokwi-gas-sensor", "top": 220, "left": 20, "attrs": { "ppm": "20" } },
+
+    { "id": "pot_current", "type": "wokwi-potentiometer", "top": 420, "left": 20, "attrs": { "value": "330" } },
+
+    { "id": "lcd1", "type": "wokwi-lcd1602", "top": 620, "left": 320, "attrs": { "pins": "i2c" } },
+
+    { "id": "relay_pump", "type": "wokwi-relay-module", "top": 200, "left": 760, "attrs": {} },
+    { "id": "relay_valve", "type": "wokwi-relay-module", "top": 340, "left": 760, "attrs": {} },
+    { "id": "relay_fan", "type": "wokwi-relay-module", "top": 480, "left": 760, "attrs": {} },
+
+    { "id": "r_led_green", "type": "wokwi-resistor", "top": 30, "left": 380, "rotate": 90, "attrs": { "value": "220" } },
+    { "id": "led_green", "type": "wokwi-led", "top": 30, "left": 320, "attrs": { "color": "green", "label": "STATUS" } },
+
+    { "id": "r_led_red", "type": "wokwi-resistor", "top": 30, "left": 460, "rotate": 90, "attrs": { "value": "220" } },
+    { "id": "led_red", "type": "wokwi-led", "top": 30, "left": 520, "attrs": { "color": "red", "label": "ALARM" } }
+  ],
+  "connections": [
+    ["us:VCC", "esp:VIN", "red", ["v-10"]],
+    ["us:GND", "esp:GND.1", "black", ["v-20"]],
+    ["us:TRIG", "esp:D25", "green", []],
+    ["us:ECHO", "esp:D34", "yellow", []],
+
+    ["ds18b20:VCC", "esp:3V3", "red", []],
+    ["ds18b20:GND", "esp:GND.1", "black", []],
+    ["ds18b20:DQ", "esp:D4", "cyan", []],
+    ["ds18b20:DQ", "r_pullup:1", "cyan", []],
+    ["r_pullup:2", "esp:3V3", "red", []],
+
+    ["gas1:VCC", "esp:VIN", "red", []],
+    ["gas1:GND", "esp:GND.1", "black", []],
+    ["gas1:AO", "esp:D32", "purple", []],
+
+    ["pot_current:VCC", "esp:3V3", "red", []],
+    ["pot_current:GND", "esp:GND.1", "black", []],
+    ["pot_current:SIG", "esp:D33", "orange", []],
+
+    ["lcd1:VCC", "esp:VIN", "red", []],
+    ["lcd1:GND", "esp:GND.2", "black", []],
+    ["lcd1:SDA", "esp:D21", "blue", []],
+    ["lcd1:SCL", "esp:D22", "yellow", []],
+
+    ["relay_pump:VCC", "esp:VIN", "red", []],
+    ["relay_pump:GND", "esp:GND.2", "black", []],
+    ["relay_pump:IN", "esp:D26", "green", []],
+
+    ["relay_valve:VCC", "esp:VIN", "red", []],
+    ["relay_valve:GND", "esp:GND.2", "black", []],
+    ["relay_valve:IN", "esp:D27", "green", []],
+
+    ["relay_fan:VCC", "esp:VIN", "red", []],
+    ["relay_fan:GND", "esp:GND.2", "black", []],
+    ["relay_fan:IN", "esp:D14", "green", []],
+
+    ["esp:D2", "r_led_green:1", "green", []],
+    ["r_led_green:2", "led_green:A", "green", []],
+    ["led_green:C", "esp:GND.1", "black", ["v20"]],
+
+    ["esp:D12", "r_led_red:1", "red", []],
+    ["r_led_red:2", "led_red:A", "red", []],
+    ["led_red:C", "esp:GND.1", "black", ["v20"]]
+  ],
+  "serialMonitor": {
+    "display": "always"
+  }
+}
