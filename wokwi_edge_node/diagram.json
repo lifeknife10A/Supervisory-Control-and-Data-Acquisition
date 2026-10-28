@@ -69,11 +69,11 @@
     ["relay_fan:GND", "esp:GND.2", "black", []],
     ["relay_fan:IN", "esp:D14", "green", []],
 
-    ["esp:D2", "r_led_green:1", "green", []],
+    ["esp:D23", "r_led_green:1", "green", []],
     ["r_led_green:2", "led_green:A", "green", []],
     ["led_green:C", "esp:GND.1", "black", ["v20"]],
 
-    ["esp:D12", "r_led_red:1", "red", []],
+    ["esp:D13", "r_led_red:1", "red", []],
     ["r_led_red:2", "led_red:A", "red", []],
     ["led_red:C", "esp:GND.1", "black", ["v20"]]
   ],

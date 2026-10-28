@@ -15,11 +15,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, StrictBool
 
 try:
-    from .process_policy import ACTUATORS, SENSOR_RANGES, UNKNOWN, normalize_payload, evaluate_process_health
+    from .process_policy import (ACTUATORS, OPTIONAL_RANGES, SENSOR_RANGES, UNKNOWN,
+                                 normalize_payload, evaluate_process_health)
     from .anomaly_model import AnomalyDetector, RateTracker
     from .telemetry_logger import TelemetryLogger
 except ImportError:  # uvicorn server:app / LabVIEW script directory
-    from process_policy import ACTUATORS, SENSOR_RANGES, UNKNOWN, normalize_payload, evaluate_process_health
+    from process_policy import (ACTUATORS, OPTIONAL_RANGES, SENSOR_RANGES, UNKNOWN,
+                                normalize_payload, evaluate_process_health)
     from anomaly_model import AnomalyDetector, RateTracker
     from telemetry_logger import TelemetryLogger
 
@@ -39,6 +41,7 @@ class ControlCommand(BaseModel):
 def initial_state():
     return {
         **{name: None for name in SENSOR_RANGES},
+        **{name: None for name in OPTIONAL_RANGES},
         "pump_active": False, "valve_open": False, "fan_active": True,
         "status_class": UNKNOWN[0], "health_label": UNKNOWN[1],
         "recommendation": UNKNOWN[2], "data_valid": False,

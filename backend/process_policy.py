@@ -8,6 +8,15 @@ SENSOR_RANGES = {
     "gas_ppm": (0.0, 1000.0),
     "current_draw": (0.0, 5.0),
 }
+# Auxiliary readings (BME280, supply sensor, raw MQ-2 output) feed ML only, never safety.
+# Out of range means absent (e.g. the firmware's 0x7FFF fault sentinel) and becomes None.
+OPTIONAL_RANGES = {
+    "ambient_temp": (-40.0, 85.0),
+    "humidity": (0.0, 100.0),
+    "pressure_hpa": (300.0, 1100.0),
+    "supply_voltage": (0.0, 25.0),
+    "gas_sensor_mv": (0.0, 5000.0),
+}
 ACTUATORS = ("pump_active", "valve_open", "fan_active")
 UNKNOWN = (2, "UNKNOWN", "Telemetry unavailable or invalid. Pump inhibited; verify sensors and bridge before restarting.")
 # Only explicit aliases: unrelated labels must never be interpreted as sensors.
@@ -16,6 +25,10 @@ ALIASES = {
     "temperature": "temperature", "temp": "temperature",
     "gas": "gas_ppm", "gas_ppm": "gas_ppm", "ppm": "gas_ppm",
     "current": "current_draw", "current_draw": "current_draw", "amps": "current_draw",
+    "ambient_temp": "ambient_temp", "ambient_temperature": "ambient_temp",
+    "humidity": "humidity", "pressure": "pressure_hpa", "pressure_hpa": "pressure_hpa",
+    "supply_voltage": "supply_voltage", "voltage": "supply_voltage",
+    "gas_sensor_mv": "gas_sensor_mv", "mq2_mv": "gas_sensor_mv",
     **{name: name for name in ACTUATORS},
 }
 
@@ -47,6 +60,14 @@ def normalize_payload(value):
     if not all(name in result for name in SENSOR_RANGES):
         raise ValueError("All four sensor readings are required")
     validate_sensors(result)
+    for name, (low, high) in OPTIONAL_RANGES.items():
+        value = result.get(name)
+        if value is None:
+            result[name] = None
+        elif isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{name} must be a number when supplied")
+        elif not math.isfinite(value) or not low <= value <= high:
+            result[name] = None
     for name in ACTUATORS:
         if name in result and not isinstance(result[name], bool):
             raise ValueError(f"{name} must be a boolean when supplied")

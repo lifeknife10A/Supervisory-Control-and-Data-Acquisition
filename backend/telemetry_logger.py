@@ -3,8 +3,9 @@
 import csv
 import os
 
+OPTIONAL_FIELDS = ("ambient_temp", "humidity", "pressure_hpa", "supply_voltage", "gas_sensor_mv")
 FIELDS = ("timestamp", "tank_level", "temperature", "gas_ppm", "current_draw",
-          "pump_active", "valve_open", "fan_active", "status_class", "anomaly_score")
+          "pump_active", "valve_open", "fan_active", "status_class", "anomaly_score", *OPTIONAL_FIELDS)
 DEFAULT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "telemetry_log.csv")
 
 
@@ -31,4 +32,6 @@ def read_rows(path=DEFAULT_PATH):
                 **{key: float(row[key]) for key in ("tank_level", "temperature", "gas_ppm", "current_draw")},
                 **{key: row[key] == "True" for key in ("pump_active", "valve_open", "fan_active")},
                 "status_class": int(row["status_class"]),
+                # Older logs lack these columns; blanks mean the sensor was absent.
+                **{key: float(row[key]) if row.get(key) else None for key in OPTIONAL_FIELDS},
             }

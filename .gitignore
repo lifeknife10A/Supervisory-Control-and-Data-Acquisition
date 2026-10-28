@@ -43,7 +43,8 @@ pnpm-debug.log*
 .playwright-cli/
 .tempmediaStorage/
 
-# Local Environment Variables
+# Local Environment Variables & firmware credentials
+wokwi_edge_node/src/secrets.h
 .env
 .env.local
 .env.*.local

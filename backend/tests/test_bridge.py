@@ -31,6 +31,24 @@ class BridgeTests(unittest.TestCase):
                 self.assertFalse(result['data_valid'])
                 self.assertFalse(result['actuator_commands']['pump_active'])
 
+    def test_optional_auxiliary_readings(self):
+        result = self.post(ambient_temp=24.5, humidity=55.0, pressure=1012.3, voltage=12.1, mq2_mv=180)
+        self.assertEqual(result['health_label'], 'HEALTHY')
+        state = self.client.get('/api/telemetry').json()
+        self.assertEqual((state['ambient_temp'], state['pressure_hpa'], state['supply_voltage']), (24.5, 1012.3, 12.1))
+        # Firmware fault sentinel (0x7FFF / 10) on a missing BME280 must not invalidate the plant.
+        result = self.post(ambient_temp=3276.7, humidity=3276.7)
+        self.assertTrue(result['data_valid'])
+        state = self.client.get('/api/telemetry').json()
+        self.assertIsNone(state['ambient_temp'])
+        self.assertIsNone(state['supply_voltage'])  # not resent, so not stale
+        self.assertFalse(self.post(humidity='wet')['data_valid'])
+
+    def test_core_sensor_fault_sentinel_inhibits_pump(self):
+        result = self.post(temperature=3276.7, pump_active=True)
+        self.assertEqual(result['health_label'], 'UNKNOWN')
+        self.assertFalse(result['actuator_commands']['pump_active'])
+
     def test_interlocks(self):
         result = self.post(tank_level=90, gas_ppm=300, pump_active=True, valve_open=False, fan_active=False)
         self.assertEqual(result['actuator_commands'], dict(pump_active=False, valve_open=True, fan_active=True))

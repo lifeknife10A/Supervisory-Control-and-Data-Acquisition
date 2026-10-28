@@ -54,14 +54,20 @@ This document serves as the **complete engineering blueprint** for building the 
 2. **Read Process Registers:**
    - VI: `Read Holding Registers.vi` (Function Code 03)
    - Starting Address: `0`
-   - Quantity: `4`
+   - Quantity: `9`
 3. **Scale to Engineering Units:**
    - `Register 0`: Water Level = `Value / 10.0` (%)
-   - `Register 1`: Temperature = `Value / 10.0` (°C)
+   - `Register 1`: Temperature = `I16(Value) / 10.0` (°C)
    - `Register 2`: Gas PPM = `Value * 1.0` (PPM)
    - `Register 3`: Current Draw = `Value / 100.0` (Amperes)
+   - `Register 4`: Ambient Temperature = `I16(Value) / 10.0` (°C, BME280, optional)
+   - `Register 5`: Humidity = `Value / 10.0` (%RH, BME280, optional)
+   - `Register 6`: Pressure = `Value / 10.0` (hPa, BME280, optional)
+   - `Register 7`: Supply Voltage = `Value / 100.0` (V, optional)
+   - `Register 8`: MQ-2 Output = `Value * 1.0` (mV, optional)
+   - **Fault sentinel:** a raw `32767` (`0x7FFF`) means the sensor is faulty, missing or warming up. Forward the scaled value unchanged; the bridge rejects it (core sensors → `UNKNOWN`, pump inhibited) or stores it as absent (optional sensors).
 4. **Bundle into Cluster:**
-   - Create a LabVIEW Cluster named `SCADA_Telemetry` containing the 4 numeric values.
+   - Create a LabVIEW Cluster named `SCADA_Telemetry` with the 4 process values (`tank_level`, `temperature`, `gas_ppm`, `current_draw`) and, optionally, `ambient_temp`, `humidity`, `pressure_hpa`, `supply_voltage`, `gas_sensor_mv`.
 
 ---
 

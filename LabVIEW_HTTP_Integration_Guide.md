@@ -15,14 +15,21 @@ LabVIEW can poll the simulated ESP32 (Wokwi) or local Modbus server using the **
 * **Polling Rate:** 200ms recommended
 
 ### Reading Telemetry in LabVIEW:
-1. Use **`Read Holding Registers.vi`** (Function Code 03) starting at address `0` for `4` registers:
-   - `Register 0`: Water Tank Level ($\div 10$ to get percentage $0.0\% - 100.0\%$)
-   - `Register 1`: Reactor Temperature ($\div 10$ to get $^\circ\text{C}$)
-   - `Register 2`: Gas PPM ($1:1$ scale)
-   - `Register 3`: Current Draw ($\div 100$ to get Amperes)
-2. Use **`Read Coils.vi`** (Function Code 01) starting at address `0` for `2` coils:
+1. Use **`Read Holding Registers.vi`** (Function Code 03) starting at address `0` for `9` registers:
+   - `Register 0`: Water Tank Level ($\div 10$ to get percentage $0.0\% - 100.0\%$) → JSON `tank_level`
+   - `Register 1`: Process Temperature (**I16**, $\div 10$ to get $^\circ\text{C}$) → `temperature`
+   - `Register 2`: Gas PPM ($1:1$ scale) → `gas_ppm`
+   - `Register 3`: Current Draw ($\div 100$ to get Amperes) → `current_draw`
+   - `Register 4`: BME280 Ambient Temperature (**I16**, $\div 10$ → $^\circ\text{C}$) → `ambient_temp` *(optional)*
+   - `Register 5`: BME280 Humidity ($\div 10$ → %RH) → `humidity` *(optional)*
+   - `Register 6`: BME280 Pressure ($\div 10$ → hPa) → `pressure_hpa` *(optional)*
+   - `Register 7`: Supply Voltage ($\div 100$ → V) → `supply_voltage` *(optional)*
+   - `Register 8`: MQ-2 sensor output (mV, $1:1$) → `gas_sensor_mv` *(optional, for gas calibration)*
+   - A register reading `32767` (`0x7FFF`) means that sensor is faulty, missing or warming up. Forward the scaled value unchanged: the bridge rejects it (core sensors → `UNKNOWN`, pump inhibited) or stores it as absent (optional sensors).
+2. Use **`Read Coils.vi`** (Function Code 01) starting at address `0` for `3` coils:
    - `Coil 0`: Pump Relay State (Boolean)
    - `Coil 1`: Valve Relay State (Boolean)
+   - `Coil 2`: Exhaust Fan State (Boolean)
 
 ---
 

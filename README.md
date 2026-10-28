@@ -90,10 +90,18 @@ Open your browser at **`http://localhost:5173`**.
 | :--- | :--- | :--- | :--- | :--- |
 | **00001 (Coil 0)** | Discrete Coil (FC01/05) | `PUMP_RELAY` | 0 (OFF) or 1 (ON) | Boolean |
 | **00002 (Coil 1)** | Discrete Coil (FC01/05) | `VALVE_RELAY` | 0 (Closed) or 1 (Open) | Boolean |
+| **00003 (Coil 2)** | Discrete Coil (FC01/05) | `FAN_RELAY` | 0 (OFF) or 1 (ON) | Boolean |
 | **40001 (Reg 0)** | Holding Register (FC03/04) | `TANK_LEVEL` | 0 – 1000 (0.0% to 100.0%) | $\div 10$ |
-| **40002 (Reg 1)** | Holding Register (FC03/04) | `PROCESS_TEMP` | 0 – 1000 (0.0°C to 100.0°C) | $\div 10$ |
-| **40003 (Reg 2)** | Holding Register (FC03/04) | `GAS_PPM` | 0 – 1000 PPM | $1:1$ |
+| **40002 (Reg 1)** | Holding Register (FC03/04) | `PROCESS_TEMP` | −550 – 1250 (−55.0°C to 125.0°C), **I16** | $\div 10$ |
+| **40003 (Reg 2)** | Holding Register (FC03/04) | `GAS_PPM` | 0 – 1000 PPM (MQ-2 LPG curve) | $1:1$ |
 | **40004 (Reg 3)** | Holding Register (FC03/04) | `MOTOR_CURRENT`| 0 – 500 (0.00A to 5.00A) | $\div 100$ |
+| **40005 (Reg 4)** | Holding Register (FC03/04) | `AMBIENT_TEMP` | BME280 °C, **I16** | $\div 10$ |
+| **40006 (Reg 5)** | Holding Register (FC03/04) | `HUMIDITY` | BME280 0 – 1000 (0.0% to 100.0% RH) | $\div 10$ |
+| **40007 (Reg 6)** | Holding Register (FC03/04) | `PRESSURE` | BME280 hPa | $\div 10$ |
+| **40008 (Reg 7)** | Holding Register (FC03/04) | `SUPPLY_VOLTAGE` | 0 – 2500 (0.00V to 25.00V) | $\div 100$ |
+| **40009 (Reg 8)** | Holding Register (FC03/04) | `GAS_SENSOR_MV` | MQ-2 AO at the sensor, mV | $1:1$ |
+
+Any register reading `32767` (`0x7FFF`) means its sensor is faulty, missing or (MQ-2) warming up.
 
 ---
 
