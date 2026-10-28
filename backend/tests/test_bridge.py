@@ -12,6 +12,8 @@ class BridgeTests(unittest.TestCase):
         server.scada_state.update(server.initial_state())
         server.fan_required = False
         server.connected_websockets.clear()
+        server.rate_tracker.reset()
+        server.telemetry_logger = None
         self.client = TestClient(server.app, raise_server_exceptions=False)
 
     def post(self, **changes):

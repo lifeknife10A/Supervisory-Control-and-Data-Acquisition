@@ -36,10 +36,12 @@ export function App() {
   const telemetry = useWorkbenchStore((s) => s.telemetry);
   useEffect(() => {
     if (!isSimulating) return;
+    // The bridge rejects unknown fields (e.g. the locally computed status_class), so send only what it accepts.
+    const { tank_level, temperature, gas_ppm, current_draw, pump_active, valve_open, fan_active } = telemetry;
     fetch('http://localhost:8000/api/telemetry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(telemetry),
+      body: JSON.stringify({ tank_level, temperature, gas_ppm, current_draw, pump_active, valve_open, fan_active }),
     }).catch(() => {});
   }, [telemetry, isSimulating]);
 

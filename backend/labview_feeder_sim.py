@@ -16,7 +16,8 @@ import math
 import sys
 import argparse
 
-BRIDGE_URL = "http://localhost:8000/api/telemetry"
+# 127.0.0.1, not localhost: Windows tries IPv6 first and stalls ~2 s per request.
+BRIDGE_URL = "http://127.0.0.1:8000/api/telemetry"
 
 def run_feeder(fault_mode="normal", rate_hz=4.0):
     interval = 1.0 / rate_hz
@@ -32,27 +33,32 @@ def run_feeder(fault_mode="normal", rate_hz=4.0):
     pump_active = True
     valve_open = False
     fan_active = False
+    last = time.monotonic() - interval
 
     while True:
-        t += interval
+        # Advance physics by real elapsed time so rates stay physical if requests are slow.
+        now = time.monotonic()
+        dt, last = now - last, now
+        t += dt
 
         # Physics Simulation
         if fault_mode == "normal":
             # Normal fill & drain cycle
             if pump_active:
-                tank_level += 0.4
+                tank_level += 1.6 * dt
                 if tank_level >= 75.0:
                     pump_active = False
                     valve_open = True
             elif valve_open:
-                tank_level -= 0.5
+                tank_level -= 2.0 * dt
                 if tank_level <= 30.0:
                     pump_active = True
                     valve_open = False
 
             temperature = 28.0 + 3.0 * math.sin(t * 0.1)
             gas_ppm = 18.0 + 4.0 * math.cos(t * 0.15)
-            current_draw = 1.60 + (0.15 * math.sin(t * 0.5) if pump_active else 0.0)
+            # ACS712 idles near zero when the pump relay is open.
+            current_draw = 1.60 + 0.15 * math.sin(t * 0.5) if pump_active else 0.05
 
         elif fault_mode == "gas":
             # High gas leak scenario

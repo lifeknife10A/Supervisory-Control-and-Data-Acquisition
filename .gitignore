@@ -24,6 +24,10 @@ cad_env/
 env/
 **/env/
 
+# Telemetry history & trained models (regenerate with backend/train_anomaly_model.py)
+backend/data/
+backend/models/
+
 # PlatformIO & Embedded Builds
 .pio/
 **/.pio/

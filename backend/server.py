@@ -2,6 +2,8 @@
 
 import json
 import logging
+import os
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -14,8 +16,12 @@ from pydantic import BaseModel, ConfigDict, StrictBool
 
 try:
     from .process_policy import ACTUATORS, SENSOR_RANGES, UNKNOWN, normalize_payload, evaluate_process_health
+    from .anomaly_model import AnomalyDetector, RateTracker
+    from .telemetry_logger import TelemetryLogger
 except ImportError:  # uvicorn server:app / LabVIEW script directory
     from process_policy import ACTUATORS, SENSOR_RANGES, UNKNOWN, normalize_payload, evaluate_process_health
+    from anomaly_model import AnomalyDetector, RateTracker
+    from telemetry_logger import TelemetryLogger
 
 app = FastAPI(title="SCADA LabVIEW Telemetry Bridge", version="2.1.0")
 logger = logging.getLogger(__name__)
@@ -36,6 +42,7 @@ def initial_state():
         "pump_active": False, "valve_open": False, "fan_active": True,
         "status_class": UNKNOWN[0], "health_label": UNKNOWN[1],
         "recommendation": UNKNOWN[2], "data_valid": False,
+        "operating_mode": None, "anomaly_score": None, "anomaly_detected": None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -44,6 +51,15 @@ scada_state = initial_state()
 connected_websockets = []
 # Safety demand is independent of manual/reported fan state.
 fan_required = False
+# Advisory ML only: its output never feeds enforce_safety or status_class.
+anomaly_detector = AnomalyDetector.load()
+rate_tracker = RateTracker()
+clock = time.monotonic
+last_ingest = None
+# SCADA_TELEMETRY_LOG=off disables history; any other value is the CSV path.
+_log_setting = os.environ.get("SCADA_TELEMETRY_LOG")
+telemetry_logger = (None if _log_setting == "off"
+                    else TelemetryLogger(_log_setting) if _log_setting else TelemetryLogger())
 
 
 def response_payload(state):
@@ -67,8 +83,10 @@ def enforce_safety(state):
 
 def mark_unknown():
     # Keep last readings for inspection, but explicitly invalidate their health.
+    rate_tracker.reset()
     scada_state.update(status_class=UNKNOWN[0], health_label=UNKNOWN[1],
                        recommendation=UNKNOWN[2], data_valid=False,
+                       operating_mode=None, anomaly_score=None, anomaly_detected=None,
                        timestamp=datetime.now(timezone.utc).isoformat())
     enforce_safety(scada_state)
     return response_payload(scada_state)
@@ -118,6 +136,28 @@ def get_telemetry():
     return dict(scada_state)
 
 
+def score_anomaly(state):
+    """Advisory dynamics check on the plant as reported, before interlocks rewrite actuators."""
+    global last_ingest
+    now = clock()
+    dt = None if last_ingest is None else now - last_ingest
+    last_ingest = now
+    mode, features = rate_tracker.update(state, dt)
+    score, detected = anomaly_detector.score(mode, features)
+    state.update(operating_mode=mode, anomaly_score=score, anomaly_detected=detected)
+    if detected:
+        state["recommendation"] += f" Advisory: unusual plant dynamics while {mode}; inspect pump, valve and sensors."
+
+
+def log_history(state):
+    if telemetry_logger is None:
+        return
+    try:
+        telemetry_logger.log(state)
+    except OSError:
+        logger.exception("Telemetry history write failed")
+
+
 async def ingest_telemetry(parsed):
     global fan_required
     try:
@@ -128,6 +168,9 @@ async def ingest_telemetry(parsed):
     state.update(values)
     status, label, rec = evaluate_process_health(*(values[key] for key in SENSOR_RANGES))
     state.update(status_class=status, health_label=label, recommendation=rec, data_valid=True)
+    state["timestamp"] = datetime.now(timezone.utc).isoformat()
+    score_anomaly(state)
+    log_history(state)
     gas = values["gas_ppm"]
     if gas >= 80:
         fan_required = True

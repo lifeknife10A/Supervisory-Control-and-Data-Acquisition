@@ -55,7 +55,7 @@ Open a terminal in `Mini Project` and run:
 cd backend
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt
-./venv/bin/python train_model.py
+./venv/bin/python train_anomaly_model.py   # add --csv data/telemetry_log.csv once you have logged history
 ./venv/bin/python -m uvicorn server:app --reload --port 8000
 ```
 Backend will be live at `http://localhost:8000` (API Docs at `http://localhost:8000/docs`).

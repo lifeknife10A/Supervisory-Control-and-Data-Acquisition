@@ -1,0 +1,7 @@
+fastapi>=0.115
+uvicorn>=0.34
+pydantic>=2.10
+scikit-learn>=1.6
+joblib>=1.4
+numpy>=2.0
+httpx>=0.28  # FastAPI TestClient for backend/tests
