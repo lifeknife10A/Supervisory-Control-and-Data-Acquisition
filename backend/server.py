@@ -1,245 +1,196 @@
-"""
-SCADA Telemetry & LabVIEW FastAPI Bridge Server
-Connects LabVIEW VI, ESP32 Modbus Edge Node, and React 3D Digital Twin Frontend
-"""
+"""In-memory LabVIEW HTTP/WebSocket bridge; no direct hardware I/O."""
 
+import json
+import logging
+from datetime import datetime, timezone
+from typing import Optional
+
+import uvicorn
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime, timezone
-import asyncio
-import json
-import uvicorn
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, StrictBool
 
-app = FastAPI(
-    title="SCADA Industrial Process Telemetry & LabVIEW Bridge",
-    version="2.0.0",
-    description="Real-time HTTP REST & WebSocket Bridge connecting LabVIEW and React Web HMI",
-)
+try:
+    from .process_policy import ACTUATORS, SENSOR_RANGES, UNKNOWN, normalize_payload, evaluate_process_health
+except ImportError:  # uvicorn server:app / LabVIEW script directory
+    from process_policy import ACTUATORS, SENSOR_RANGES, UNKNOWN, normalize_payload, evaluate_process_health
 
-# Global catch-all to ensure LabVIEW Unflatten From JSON never receives a 4xx/5xx error object
+app = FastAPI(title="SCADA LabVIEW Telemetry Bridge", version="2.1.0")
+logger = logging.getLogger(__name__)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
+                   allow_methods=["*"], allow_headers=["*"])
+
+
+class ControlCommand(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pump_active: Optional[StrictBool] = None
+    valve_open: Optional[StrictBool] = None
+    fan_active: Optional[StrictBool] = None
+
+
+def initial_state():
+    return {
+        **{name: None for name in SENSOR_RANGES},
+        "pump_active": False, "valve_open": False, "fan_active": True,
+        "status_class": UNKNOWN[0], "health_label": UNKNOWN[1],
+        "recommendation": UNKNOWN[2], "data_valid": False,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+scada_state = initial_state()
+connected_websockets = []
+# Safety demand is independent of manual/reported fan state.
+fan_required = False
+
+
+def response_payload(state):
+    return {**{key: state[key] for key in
+               ("status_class", "health_label", "recommendation", "data_valid")},
+            "actuator_commands": {key: state[key] for key in ACTUATORS}}
+
+
+def enforce_safety(state):
+    if not state["data_valid"]:
+        state["pump_active"] = False
+        state["fan_active"] = True
+        return
+    if state["status_class"] == 2:
+        state["pump_active"] = False
+    if state["tank_level"] >= 88:
+        state["valve_open"] = True
+    if fan_required:
+        state["fan_active"] = True
+
+
+def mark_unknown():
+    # Keep last readings for inspection, but explicitly invalidate their health.
+    scada_state.update(status_class=UNKNOWN[0], health_label=UNKNOWN[1],
+                       recommendation=UNKNOWN[2], data_valid=False,
+                       timestamp=datetime.now(timezone.utc).isoformat())
+    enforce_safety(scada_state)
+    return response_payload(scada_state)
+
+
+async def broadcast():
+    snapshot = json.dumps(scada_state, allow_nan=False)
+    for ws in list(connected_websockets):
+        try:
+            await ws.send_text(snapshot)
+        except Exception:
+            if ws in connected_websockets:
+                connected_websockets.remove(ws)
+
+
+async def invalid_telemetry():
+    result = mark_unknown()
+    await broadcast()
+    return result
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    return JSONResponse(
-        status_code=200,
-        content={
-            "status_class": 0,
-            "health_label": "HEALTHY",
-            "recommendation": "Nominal process operating conditions. All loops green.",
-        }
-    )
+    logger.error("Bridge request failed", exc_info=(type(exc), exc, exc.__traceback__))
+    result = await invalid_telemetry()
+    # Preserve LabVIEW's historical HTTP-200 JSON parsing on telemetry only.
+    return JSONResponse(result, status_code=200 if request.url.path == "/api/telemetry" else 500)
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=200,
-        content={
-            "status_class": 0,
-            "health_label": "HEALTHY",
-            "recommendation": "Nominal process operating conditions. All loops green.",
-        }
-    )
+    if request.url.path == "/api/telemetry":
+        return JSONResponse(await invalid_telemetry())
+    # A rejected control is not a new sensor observation; leave state untouched.
+    return JSONResponse({"status_class": 2, "health_label": "UNKNOWN",
+                         "recommendation": "Invalid command; no changes applied.",
+                         "data_valid": False}, status_code=422)
 
-# Enable CORS for React Frontend (localhost:5173)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class TelemetryPayload(BaseModel):
-    tank_level: Optional[float] = 54.2
-    temperature: Optional[float] = 29.4
-    gas_ppm: Optional[float] = 22.0
-    current_draw: Optional[float] = 1.65
-    pump_active: Optional[bool] = True
-    valve_open: Optional[bool] = False
-    fan_active: Optional[bool] = False
-
-    class Config:
-        extra = "ignore"
-
-class ControlCommand(BaseModel):
-    pump_active: Optional[bool] = None
-    valve_open: Optional[bool] = None
-    fan_active: Optional[bool] = None
-
-# In-memory SCADA Process State
-scada_state = {
-    "tank_level": 54.2,
-    "temperature": 29.4,
-    "gas_ppm": 22.0,
-    "current_draw": 1.65,
-    "pump_active": True,
-    "valve_open": False,
-    "fan_active": False,
-    "status_class": 0,
-    "health_label": "HEALTHY",
-    "recommendation": "Nominal industrial process parameters. Normal operation.",
-    "timestamp": datetime.now(timezone.utc).isoformat(),
-}
-
-connected_websockets: List[WebSocket] = []
-
-def evaluate_process_health(tank: float, temp: float, gas: float, current: float) -> tuple[int, str, str]:
-    if tank >= 88.0 or gas >= 250.0 or temp >= 70.0 or current >= 3.8:
-        reasons = []
-        if tank >= 88.0: reasons.append(f"Tank Overflow Hazard ({tank:.1f}%)")
-        if gas >= 250.0: reasons.append(f"Toxic Gas Spike ({gas:.0f} PPM)")
-        if temp >= 70.0: reasons.append(f"Thermal Runaway ({temp:.1f} °C)")
-        if current >= 3.8: reasons.append(f"Motor Overload ({current:.2f} A)")
-        return 2, "CRITICAL TRIP (FAULT)", f"EMERGENCY SHUTDOWN: {', '.join(reasons)}. Inflow pump interlocked OFF."
-
-    if tank >= 78.0 or tank <= 25.0 or gas >= 80.0 or temp >= 50.0 or current >= 2.8:
-        reasons = []
-        if tank >= 78.0: reasons.append("Tank High Warning")
-        if tank <= 25.0: reasons.append("Tank Low Warning")
-        if gas >= 80.0: reasons.append("Gas Concentration Elevated")
-        if temp >= 50.0: reasons.append("Elevated Temperature")
-        if current >= 2.8: reasons.append("Elevated Motor Current")
-        return 1, "WARNING", f"Caution: {', '.join(reasons)}. Safety fan activated."
-
-    return 0, "HEALTHY", "Nominal process operating conditions. All loops green."
 
 @app.get("/")
 def root():
-    return {
-        "status": "online",
-        "service": "SCADA LabVIEW / React Telemetry Bridge",
-        "endpoints": {
-            "get_telemetry": "/api/telemetry (GET)",
-            "post_telemetry": "/api/telemetry (POST)",
-            "post_control": "/api/control (POST)",
-            "ws_telemetry": "/ws/telemetry (WebSocket)",
-        },
-    }
+    return {"status": "online", "service": "SCADA LabVIEW Telemetry Bridge"}
+
 
 @app.get("/api/telemetry")
 def get_telemetry():
-    """Returns latest telemetry for LabVIEW or React UI"""
-    return scada_state
+    return dict(scada_state)
+
+
+async def ingest_telemetry(parsed):
+    global fan_required
+    try:
+        values = normalize_payload(parsed)
+    except (ValueError, TypeError, OverflowError):
+        return await invalid_telemetry()
+    state = dict(scada_state)
+    state.update(values)
+    status, label, rec = evaluate_process_health(*(values[key] for key in SENSOR_RANGES))
+    state.update(status_class=status, health_label=label, recommendation=rec, data_valid=True)
+    gas = values["gas_ppm"]
+    if gas >= 80:
+        fan_required = True
+    elif gas < 45:
+        fan_required = False
+        state["fan_active"] = False
+    enforce_safety(state)
+    state["timestamp"] = datetime.now(timezone.utc).isoformat()
+    scada_state.update(state)
+    result = response_payload(state)
+    await broadcast()
+    return result
+
 
 @app.post("/api/telemetry")
 async def post_telemetry(request: Request):
-    """
-    Receives telemetry updates from LabVIEW VI or ESP32 Node,
-    evaluates safety diagnostics, and broadcasts to active WebSockets.
-    Tolerates any content-type (application/json, text/plain, etc.) and any cluster wrapping.
-    """
     try:
-        body_bytes = await request.body()
-        raw_text = body_bytes.decode("utf-8", errors="ignore").strip()
-        parsed = json.loads(raw_text) if raw_text else {}
-    except Exception:
-        parsed = {}
+        parsed = json.loads((await request.body()).decode("utf-8"))
+    except (ValueError, UnicodeError):
+        return JSONResponse(await invalid_telemetry())
+    return JSONResponse(await ingest_telemetry(parsed))
 
-    # If LabVIEW sends {"Cluster": {...}}, unwrap it
-    if isinstance(parsed, dict) and "Cluster" in parsed and isinstance(parsed["Cluster"], dict):
-        parsed = parsed["Cluster"]
-
-    def extract_num(keys: list[str], fallback: float) -> float:
-        if not isinstance(parsed, dict):
-            return fallback
-        for k, v in parsed.items():
-            clean = k.lower().replace(" ", "_").replace("-", "")
-            for target in keys:
-                if target in clean:
-                    try:
-                        return float(v)
-                    except (ValueError, TypeError):
-                        pass
-        return fallback
-
-    tank = extract_num(["tank", "level"], scada_state["tank_level"])
-    temp = extract_num(["temp"], scada_state["temperature"])
-    gas = extract_num(["gas", "ppm"], scada_state["gas_ppm"])
-    current = extract_num(["current", "amp"], scada_state["current_draw"])
-
-    status_class, label, rec = evaluate_process_health(tank, temp, gas, current)
-
-    pump = scada_state["pump_active"]
-    valve = scada_state["valve_open"]
-    fan = scada_state["fan_active"]
-
-    if status_class == 2:
-        pump = False
-        if tank >= 88.0:
-            valve = True
-    elif status_class == 1 and gas >= 80.0:
-        fan = True
-
-    scada_state.update({
-        "tank_level": round(tank, 2),
-        "temperature": round(temp, 2),
-        "gas_ppm": round(gas, 1),
-        "current_draw": round(current, 2),
-        "pump_active": pump,
-        "valve_open": valve,
-        "fan_active": fan,
-        "status_class": status_class,
-        "health_label": label,
-        "recommendation": rec,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
-
-    # Broadcast to WebSocket clients
-    for ws in list(connected_websockets):
-        try:
-            await ws.send_text(json.dumps(scada_state))
-        except Exception:
-            connected_websockets.remove(ws)
-
-    return JSONResponse(
-        status_code=200,
-        content={
-            "status_class": status_class,
-            "health_label": label,
-            "recommendation": rec,
-        }
-    )
 
 @app.post("/api/control")
 async def post_control(cmd: ControlCommand):
-    """Allows React Web UI or LabVIEW operators to toggle actuators"""
-    if cmd.pump_active is not None:
-        scada_state["pump_active"] = cmd.pump_active
-    if cmd.valve_open is not None:
-        scada_state["valve_open"] = cmd.valve_open
-    if cmd.fan_active is not None:
-        scada_state["fan_active"] = cmd.fan_active
+    requested = cmd.model_dump(exclude_unset=True)
+    if not requested or any(value is None for value in requested.values()):
+        return JSONResponse({"status_class": 2, "health_label": "UNKNOWN",
+                             "recommendation": "Supply at least one boolean actuator command.",
+                             "data_valid": False}, status_code=422)
+    scada_state.update(requested)
+    enforce_safety(scada_state)
     scada_state["timestamp"] = datetime.now(timezone.utc).isoformat()
+    snapshot = dict(scada_state)
+    overridden = [key for key, value in requested.items() if snapshot[key] != value]
+    await broadcast()
+    return {"status": "interlocked" if overridden else "updated",
+            "overridden": overridden, "controls": snapshot}
 
-    for ws in list(connected_websockets):
-        try:
-            await ws.send_text(json.dumps(scada_state))
-        except Exception:
-            connected_websockets.remove(ws)
-
-    return {"status": "updated", "controls": scada_state}
 
 @app.websocket("/ws/telemetry")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_websockets.append(websocket)
     try:
-        await websocket.send_text(json.dumps(scada_state))
+        await websocket.send_text(json.dumps(scada_state, allow_nan=False))
         while True:
             data = await websocket.receive_text()
             try:
                 parsed = json.loads(data)
-                if "tank_level" in parsed:
-                    # Update state
-                    await post_telemetry(TelemetryPayload(**parsed))
-            except Exception:
-                pass
+            except ValueError:
+                await invalid_telemetry()
+                continue
+            await ingest_telemetry(parsed)
     except WebSocketDisconnect:
-        connected_websockets.remove(websocket)
+        pass
+    except Exception:
+        logger.exception("WebSocket telemetry failed")
+        await invalid_telemetry()
+    finally:
+        if websocket in connected_websockets:
+            connected_websockets.remove(websocket)
+
 
 if __name__ == "__main__":
-    print("[SCADA BRIDGE] Starting FastAPI Bridge Server on http://localhost:8000...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

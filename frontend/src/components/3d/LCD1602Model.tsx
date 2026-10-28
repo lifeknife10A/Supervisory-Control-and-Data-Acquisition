@@ -43,8 +43,11 @@ export const LCD1602Model: React.FC<LCD1602ModelProps> = ({
     }
   };
 
-  const line1 = `TANK:${telemetry.tank_level.toFixed(1)}% ${telemetry.pump_active ? 'P:ON' : 'P:OFF'}`;
-  const line2 = `T:${telemetry.temperature.toFixed(0)}C G:${telemetry.gas_ppm.toFixed(0)}P V:${telemetry.valve_open ? 'V:OP' : 'V:CL'}`;
+  // 16-character budget per line like the real HD44780; slice guards overflow.
+  // Previously line2 emitted a duplicated "V:V:CL" prefix and both lines could
+  // exceed the 16x2 character cell width.
+  const line1 = `TANK:${telemetry.tank_level.toFixed(1)}% ${telemetry.pump_active ? 'P:ON' : 'P:OFF'}`.slice(0, 16);
+  const line2 = `T:${telemetry.temperature.toFixed(0)}C G:${telemetry.gas_ppm.toFixed(0)} V:${telemetry.valve_open ? 'OP' : 'CL'}`.slice(0, 16);
 
   return (
     <group onPointerDown={onPointerDown}>

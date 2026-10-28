@@ -23,8 +23,8 @@ export const HARDWARE_PINS = {
   FAN_DRIVER_IN: 'pin_gpio14',
 
   // Indicators
-  LED_GREEN_STATUS: 'pin_gpio2',
-  LED_RED_ALARM: 'pin_gpio12',
+  LED_GREEN_STATUS: 'pin_gpio23',
+  LED_RED_ALARM: 'pin_gpio13',
 
   // I2C Bus
   I2C_SDA: 'pin_gpio21',
@@ -39,8 +39,8 @@ export const PIN_METADATA = {
   },
   [HARDWARE_PINS.HC_SR04_ECHO]: {
     label: 'GPIO 34',
-    role: 'HC-SR04 Ultrasonic ECHO (Input via 5V->3.3V Divider)',
-    voltage: '3.3V Safe (Divider)',
+    role: 'HC-SR04 Ultrasonic ECHO (Input via 5V->3.0V Divider)',
+    voltage: '3.0V Safe (Divider)',
   },
   [HARDWARE_PINS.DS18B20_DATA]: {
     label: 'GPIO 4',
@@ -49,13 +49,13 @@ export const PIN_METADATA = {
   },
   [HARDWARE_PINS.MQ2_AO]: {
     label: 'GPIO 32',
-    role: 'MQ-2 Gas Sensor Analog Output (ADC1_CH4, 0-4095)',
-    voltage: '0 - 3.3V Analog',
+    role: 'MQ-2 Gas Sensor Analog Output (ADC1_CH4 via 0.6x Divider)',
+    voltage: '0 - 3.0V Safe (Divider)',
   },
   [HARDWARE_PINS.ACS712_OUT]: {
     label: 'GPIO 33',
-    role: 'ACS712 Motor Current Analog Output (ADC1_CH5, 0-4095)',
-    voltage: '0 - 3.3V Analog',
+    role: 'ACS712 Motor Current Analog Output (ADC1_CH5 via 0.6x Divider)',
+    voltage: '0.95 - 2.05V Safe (Divider)',
   },
   [HARDWARE_PINS.RELAY_PUMP_IN]: {
     label: 'GPIO 26',
@@ -73,12 +73,12 @@ export const PIN_METADATA = {
     voltage: '3.3V Control',
   },
   [HARDWARE_PINS.LED_GREEN_STATUS]: {
-    label: 'GPIO 2',
+    label: 'GPIO 23',
     role: 'Green Status Indicator LED (via 220Ω Series Resistor)',
     voltage: '3.3V Output',
   },
   [HARDWARE_PINS.LED_RED_ALARM]: {
-    label: 'GPIO 12',
+    label: 'GPIO 13',
     role: 'Red Alarm Trip Indicator LED (via 220Ω Series Resistor)',
     voltage: '3.3V Output',
   },

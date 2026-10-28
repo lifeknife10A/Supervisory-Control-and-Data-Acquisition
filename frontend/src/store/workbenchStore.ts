@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { LCD_DISPLAY_SCALE, migrateLCDScale } from '../constants/lcdDimensions';
+import { ledPins } from '../components/3d/ledDimensions';
 import type {
   WorkbenchComponent,
   WireConnection,
@@ -38,8 +40,8 @@ export function generateESP32Pins(): PinDefinition[] {
     { id: 'pin_gpio26', name: 'GPIO 26 (Pump Relay IN1)', type: 'DIGITAL_GPIO' },
     { id: 'pin_gpio27', name: 'GPIO 27 (Emergency Valve Solenoid)', type: 'DIGITAL_GPIO' },
     { id: 'pin_gpio14', name: 'GPIO 14 (Exhaust Fan Control)', type: 'DIGITAL_GPIO' },
-    { id: 'pin_gpio12', name: 'GPIO 12 (Alarm Red LED)', type: 'DIGITAL_GPIO' },
-    { id: 'pin_gpio13', name: 'GPIO 13 (Status Output)', type: 'DIGITAL_GPIO' },
+    { id: 'pin_gpio12', name: 'GPIO 12 (MTDI Strapping - Unused)', type: 'DIGITAL_GPIO' },
+    { id: 'pin_gpio13', name: 'GPIO 13 (Alarm Red LED)', type: 'DIGITAL_GPIO' },
     { id: 'pin_gnd_1', name: 'GND (Ground)', type: 'GROUND' },
     { id: 'pin_vin', name: 'VIN (5V Supply In)', type: 'POWER_VCC' },
   ];
@@ -59,7 +61,7 @@ export function generateESP32Pins(): PinDefinition[] {
     { id: 'pin_gpio3', name: 'GPIO 3 (U0RXD)', type: 'DIGITAL_GPIO' },
     { id: 'pin_gpio1', name: 'GPIO 1 (U0TXD)', type: 'DIGITAL_GPIO' },
     { id: 'pin_gpio22', name: 'GPIO 22 (I2C SCL)', type: 'I2C' },
-    { id: 'pin_gpio23', name: 'GPIO 23 (VSPI_MOSI)', type: 'DIGITAL_GPIO' },
+    { id: 'pin_gpio23', name: 'GPIO 23 (Status Green LED)', type: 'DIGITAL_GPIO' },
   ];
 
   const pins: PinDefinition[] = [];
@@ -197,14 +199,15 @@ export const COMPONENT_CATALOG: Omit<WorkbenchComponent, 'id' | 'position' | 'ro
     name: 'HC-SR04 Level Sensor',
     modelPath: '/models/hc_sr04.glb',
     scale: [1, 1, 1],
-    // Header pin row measured off the actual mesh (top-back edge, between the
-    // two transducer domes) - previously z=0 sat mid-depth of the board, off
-    // the real header by roughly a third of the board's depth.
+    // Header pin positions measured off the actual mesh: housing spans
+    // x=[-0.081, 0.081] at z=[-0.0466, 0.009]; the four pin posts sit at the
+    // standard 2.54mm pitch (0.0363 scene units) centered in the housing, tips
+    // reaching y=0.393. Previously x=±0.11/±0.037 floated outside the part.
     pins: [
-      { id: 'vcc', name: 'VCC (5V)', type: 'POWER_VCC', relativePosition: [-0.11, 0.38, -0.045] },
-      { id: 'trig', name: 'TRIG Pulse Out', type: 'DIGITAL_GPIO', relativePosition: [-0.037, 0.38, -0.045] },
-      { id: 'echo', name: 'ECHO Echo In', type: 'ANALOG', relativePosition: [0.037, 0.38, -0.045] },
-      { id: 'gnd', name: 'GND', type: 'GROUND', relativePosition: [0.11, 0.38, -0.045] },
+      { id: 'vcc', name: 'VCC (5V)', type: 'POWER_VCC', relativePosition: [-0.0544, 0.392, -0.045] },
+      { id: 'trig', name: 'TRIG Pulse Out', type: 'DIGITAL_GPIO', relativePosition: [-0.0182, 0.39, -0.045] },
+      { id: 'echo', name: 'ECHO Echo In', type: 'ANALOG', relativePosition: [0.0182, 0.39, -0.045] },
+      { id: 'gnd', name: 'GND', type: 'GROUND', relativePosition: [0.0544, 0.39, -0.045] },
     ]
   },
   {
@@ -275,10 +278,8 @@ export const COMPONENT_CATALOG: Omit<WorkbenchComponent, 'id' | 'position' | 'ro
     type: 'lcd_1602',
     name: '16x2 I2C LCD Screen',
     modelPath: '/models/lcd_1602.glb',
-    // Bumped up from true 1:1 scale - at real-world size the LCD reads as
-    // tiny next to the intentionally oversized breadboard/wire props elsewhere
-    // in this scene. Pin/wire endpoints scale with it (see JumperWire3D/DraftWire3D).
-    scale: [1.4, 1.4, 1.4],
+    // Workbench display size: 0.756 units wide, about 1.45× the ESP32 PCB width.
+    scale: [LCD_DISPLAY_SCALE, LCD_DISPLAY_SCALE, LCD_DISPLAY_SCALE],
     pins: [
       { id: 'gnd', name: 'GND (Ground)', type: 'GROUND', relativePosition: [-0.015, 0.03, -0.008] },
       { id: 'vcc', name: 'VCC (+5V)', type: 'POWER_VCC', relativePosition: [-0.005, 0.03, -0.008] },
@@ -291,13 +292,14 @@ export const COMPONENT_CATALOG: Omit<WorkbenchComponent, 'id' | 'position' | 'ro
     name: '5V Exhaust Fan Driver Module',
     modelPath: '/models/fan.glb',
     scale: [1, 1, 1],
-    // Pins clustered at the real 3-wire cable exit point on the fan housing
-    // (measured off the actual mesh geometry - previously spread across the
-    // bottom of the frame where there is no cable, so wires floated past it).
+    // 2-wire connector measured off the mesh: two lead stubs exit the housing
+    // on the RIGHT side at x=[0.2775, 0.3712], y centers 0.12 and 0.145,
+    // z center 0.0696. Previously pins sat at x=0.33 but wrong y/z, so wires
+    // met the fan frame edge instead of the visible cable stubs.
     pins: [
-      { id: 'vcc', name: 'VCC (+5V Supply)', type: 'POWER_VCC', relativePosition: [0.33, 0.16, 0.07] },
-      { id: 'gnd', name: 'GND (Common Return)', type: 'GROUND', relativePosition: [0.33, 0.13, 0.07] },
-      { id: 'in', name: 'IN (GPIO 14 Driver)', type: 'DIGITAL_GPIO', relativePosition: [0.33, 0.10, 0.07] },
+      { id: 'vcc', name: 'VCC (+5V Supply)', type: 'POWER_VCC', relativePosition: [0.371, 0.145, 0.0696] },
+      { id: 'gnd', name: 'GND (Common Return)', type: 'GROUND', relativePosition: [0.371, 0.12, 0.0696] },
+      { id: 'in', name: 'IN (GPIO 14 Driver)', type: 'DIGITAL_GPIO', relativePosition: [0.371, 0.1325, 0.0696] },
     ]
   },
   {
@@ -315,20 +317,14 @@ export const COMPONENT_CATALOG: Omit<WorkbenchComponent, 'id' | 'position' | 'ro
     name: '5mm Green LED',
     modelPath: '/models/led_green.glb',
     scale: [1, 1, 1],
-    pins: [
-      { id: 'anode', name: 'Anode (+)', type: 'DIGITAL_GPIO', relativePosition: [-0.03341796875, 0.002, 0] },
-      { id: 'cathode', name: 'Cathode (-)', type: 'GROUND', relativePosition: [0.03341796875, 0.002, 0] },
-    ]
+    pins: ledPins('green')
   },
   {
     type: 'led_red',
     name: '5mm Red LED',
     modelPath: '/models/led_red.glb',
     scale: [1, 1, 1],
-    pins: [
-      { id: 'anode', name: 'Anode (+)', type: 'DIGITAL_GPIO', relativePosition: [-0.00127, 0.002, 0] },
-      { id: 'cathode', name: 'Cathode (-)', type: 'GROUND', relativePosition: [0.00127, 0.002, 0] },
-    ]
+    pins: ledPins('red')
   },
   {
     type: 'resistor',
@@ -505,13 +501,13 @@ export const SCADA_REFERENCE_WIRES: WireConnection[] = [
   { id: 'w_lcd_3', fromComponentId: 'lcd_1', fromPinId: 'sda', toComponentId: 'esp32_1', toPinId: 'pin_gpio21', color: '#3b82f6', sag: 0.3 },
   { id: 'w_lcd_4', fromComponentId: 'lcd_1', fromPinId: 'scl', toComponentId: 'esp32_1', toPinId: 'pin_gpio22', color: '#eab308', sag: 0.3 },
 
-  // 9. Green Indicator LED (GPIO 2 -> 220Ω Series Resistor -> Anode, Cathode to GND)
-  { id: 'w_led_g_1', fromComponentId: 'esp32_1', fromPinId: 'pin_gpio2', toComponentId: 'resistor_led_g', toPinId: 'lead_1', color: '#10b981', sag: 0.3 },
+  // 9. Green Indicator LED (GPIO 23 -> 220Ω Series Resistor -> Anode, Cathode to GND)
+  { id: 'w_led_g_1', fromComponentId: 'esp32_1', fromPinId: 'pin_gpio23', toComponentId: 'resistor_led_g', toPinId: 'lead_1', color: '#10b981', sag: 0.3 },
   { id: 'w_led_g_2', fromComponentId: 'resistor_led_g', fromPinId: 'lead_2', toComponentId: 'led_green_1', toPinId: 'anode', color: '#10b981', sag: 0.2 },
   { id: 'w_led_g_3', fromComponentId: 'led_green_1', fromPinId: 'cathode', toComponentId: 'breadboard_1', toPinId: 'bot_gnd_18', color: '#111827', sag: 0.28 },
 
-  // 10. Red Alarm Indicator LED (GPIO 12 -> 220Ω Series Resistor -> Anode, Cathode to GND)
-  { id: 'w_led_r_1', fromComponentId: 'esp32_1', fromPinId: 'pin_gpio12', toComponentId: 'resistor_led_r', toPinId: 'lead_1', color: '#ef4444', sag: 0.3 },
+  // 10. Red Alarm Indicator LED (GPIO 13 -> 220Ω Series Resistor -> Anode, Cathode to GND)
+  { id: 'w_led_r_1', fromComponentId: 'esp32_1', fromPinId: 'pin_gpio13', toComponentId: 'resistor_led_r', toPinId: 'lead_1', color: '#ef4444', sag: 0.3 },
   { id: 'w_led_r_2', fromComponentId: 'resistor_led_r', fromPinId: 'lead_2', toComponentId: 'led_red_1', toPinId: 'anode', color: '#ef4444', sag: 0.2 },
   { id: 'w_led_r_3', fromComponentId: 'led_red_1', fromPinId: 'cathode', toComponentId: 'breadboard_1', toPinId: 'bot_gnd_24', color: '#111827', sag: 0.28 },
 ];
@@ -535,33 +531,26 @@ function loadSavedProject(): { components: WorkbenchComponent[]; wires: WireConn
     const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('scada_workbench_circuits_v2');
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.components) && Array.isArray(parsed.wires) && parsed.components.length > 0) {
+    if (Array.isArray(parsed.components) && Array.isArray(parsed.wires)) {
       // Strictly normalize all component rotations to 90-degree orthogonal multiples
       const normalizedComps = parsed.components.map((c: WorkbenchComponent) => ({
         ...c,
+        scale: c.type === 'lcd_1602' ? migrateLCDScale(c.scale) : c.scale,
         rotation: (c.rotation || [0, 0, 0]).map((angle: number) => {
           const snapped = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2);
           return Math.abs(snapped) < 1e-4 ? 0 : parseFloat(snapped.toFixed(4));
         }) as [number, number, number],
+        // Always take pin geometry from the current catalog. Saved projects can
+        // carry stale pin coordinates from older builds (e.g. LED lead pitch
+        // changes), which would detach wires from the rendered model.
+        pins: JSON.parse(JSON.stringify(
+          COMPONENT_CATALOG.find((tpl) => tpl.type === c.type)?.pins ?? c.pins
+        )),
       }));
-
-      // Auto-reconcile reference wires (such as w_hc_4 ECHO) if missing from older sessions
-      const existingWireIds = new Set(parsed.wires.map((w: WireConnection) => w.id));
-      const reconciledWires = [...parsed.wires];
-      for (const refWire of SCADA_REFERENCE_WIRES) {
-        if (!existingWireIds.has(refWire.id)) {
-          const compA = normalizedComps.find((c: WorkbenchComponent) => c.id === refWire.fromComponentId);
-          const compB = normalizedComps.find((c: WorkbenchComponent) => c.id === refWire.toComponentId);
-          if (compA && compB) {
-            reconciledWires.push(refWire);
-            existingWireIds.add(refWire.id);
-          }
-        }
-      }
 
       return {
         components: normalizedComps,
-        wires: reconciledWires,
+        wires: parsed.wires,
         wireRoutingMode: parsed.wireRoutingMode ?? 'orthogonal',
       };
     }
@@ -710,9 +699,10 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
   // Helper to record history snapshot and auto-save
   const recordHistoryAndPersist = (
     components: WorkbenchComponent[],
-    wires: WireConnection[]
+    wires: WireConnection[],
+    wireRoutingMode = get().wireRoutingMode
   ) => {
-    const { history, historyIndex, wireRoutingMode } = get();
+    const { history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({
       components: JSON.parse(JSON.stringify(components)),
@@ -858,7 +848,7 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
         const updatedComps = state.components.map((c) =>
           c.id === id ? { ...c, position } : c
         );
-        persistProject(updatedComps, state.wires);
+        persistProject(updatedComps, state.wires, state.wireRoutingMode);
         return { components: updatedComps };
       }),
 
@@ -876,7 +866,7 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
             position: [newX, c.position[1], newZ] as [number, number, number],
           };
         });
-        persistProject(updatedComps, state.wires);
+        persistProject(updatedComps, state.wires, state.wireRoutingMode);
         return { components: updatedComps };
       }),
 
@@ -919,7 +909,7 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
         const updatedComps = state.components.map((c) =>
           c.id === id ? { ...c, rotation } : c
         );
-        persistProject(updatedComps, state.wires);
+        persistProject(updatedComps, state.wires, state.wireRoutingMode);
         return { components: updatedComps };
       }),
 
@@ -1099,76 +1089,23 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
     controlMode: 'auto',
     setControlMode: (mode) => set({ controlMode: mode }),
 
-    setActuatorState: (actuator, active) =>
-      set((state) => {
-        const nextTelemetry = {
-          ...state.telemetry,
-          pump_active: actuator === 'pump' ? active : state.telemetry.pump_active,
-          valve_open: actuator === 'valve' ? active : state.telemetry.valve_open,
-          fan_active: actuator === 'fan' ? active : state.telemetry.fan_active,
-        };
-        const nextMcu = {
-          ...state.mcuState,
-          gpioStates: {
-            ...state.mcuState.gpioStates,
-            gpio26: nextTelemetry.pump_active,
-            gpio27: nextTelemetry.valve_open,
-            gpio14: nextTelemetry.fan_active,
-          },
-          modbusCoils: {
-            ...state.mcuState.modbusCoils,
-            1: nextTelemetry.pump_active,
-            2: nextTelemetry.valve_open,
-            3: nextTelemetry.fan_active,
-          },
-        };
-        return { telemetry: nextTelemetry, mcuState: nextMcu };
-      }),
+    setActuatorState: (actuator, active) => {
+      const field = { pump: 'pump_active', valve: 'valve_open', fan: 'fan_active' } as const;
+      get().setTelemetry({ [field[actuator]]: active });
+    },
 
-    // Telemetry
     telemetry: INITIAL_TELEMETRY,
-
     setTelemetry: (partial) =>
       set((state) => {
-        const updated = { ...state.telemetry, ...partial };
-        // Strict boundary clamps
-        updated.tank_level = Math.min(100.0, Math.max(0.0, parseFloat(updated.tank_level.toFixed(1))));
-        updated.temperature = Math.min(100.0, Math.max(0.0, parseFloat(updated.temperature.toFixed(1))));
-        updated.gas_ppm = Math.min(1000.0, Math.max(0.0, parseFloat(updated.gas_ppm.toFixed(1))));
-        updated.current_draw = Math.min(5.00, Math.max(0.0, parseFloat(updated.current_draw.toFixed(2))));
-
-        let status_class: 0 | 1 | 2 = 0;
-        if (
-          updated.gas_ppm > 250 ||
-          updated.temperature > 70 ||
-          updated.current_draw > 3.8 ||
-          updated.tank_level > 92 ||
-          updated.tank_level < 8
-        ) {
-          status_class = 2;
-        } else if (
-          updated.gas_ppm > 80 ||
-          updated.temperature > 45 ||
-          updated.current_draw > 2.3 ||
-          updated.tank_level > 80 ||
-          updated.tank_level < 25
-        ) {
-          status_class = 1;
-        }
-
-        // Atomically update Modbus Holding Registers
-        const nextMcu = {
-          ...state.mcuState,
-          modbusRegisters: {
-            ...state.mcuState.modbusRegisters,
-            40001: Math.round(updated.tank_level * 10),
-            40002: Math.round(updated.temperature * 10),
-            40003: Math.round(updated.gas_ppm),
-            40004: Math.round(updated.current_draw * 100),
-          },
+        // The same policy, clamps and output mapping as a tick, without process/time advance.
+        const result = executeMCUControlStep(
+          { ...state.telemetry, ...partial }, state.mcuState,
+          state.simulationTickCount, state.circuitHealth, state.controlMode, false
+        );
+        return {
+          telemetry: result.updatedTelemetry,
+          mcuState: result.updatedMCUState,
         };
-
-        return { telemetry: { ...updated, status_class }, mcuState: nextMcu };
       }),
 
     togglePump: () => {
@@ -1219,27 +1156,18 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
       }, 280);
     },
 
-    sendSerialCommand: (rawCmd: string) =>
-      set((state) => {
-        const entries = executeSerialCLICommand(rawCmd, state.mcuState, state.telemetry, {
-          reboot: () => {
-            setTimeout(() => {
-              useWorkbenchStore.getState().rebootMCU();
-            }, 50);
-          },
-          setActuator: (actuator, active) => {
-            useWorkbenchStore.getState().setActuatorState(actuator, active);
-          },
-          clearLogs: () => {
-            useWorkbenchStore.getState().clearSerialLogs();
-          },
-        });
-
-        if (entries.length === 0) return state;
-        return {
-          serialLogs: [...state.serialLogs, ...entries].slice(-250),
-        };
-      }),
+    sendSerialCommand: (rawCmd: string) => {
+      const state = get();
+      const entries = executeSerialCLICommand(rawCmd, state.mcuState, state.telemetry, {
+        reboot: () => { setTimeout(() => get().rebootMCU(), 50); },
+        setActuator: (actuator, active) => get().setActuatorState(actuator, active),
+        clearLogs: () => get().clearSerialLogs(),
+      });
+      // Callbacks can update the store: never merge a stale pre-command snapshot.
+      if (entries.length > 0) {
+        set((current) => ({ serialLogs: [...current.serialLogs, ...entries].slice(-250) }));
+      }
+    },
 
     tickMCU: () =>
       set((state) => {
@@ -1277,7 +1205,7 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
         const newIdx = state.historyIndex - 1;
         const snapshot = state.history[newIdx];
         const health = validateCircuitGraph(snapshot.components, snapshot.wires);
-        persistProject(snapshot.components, snapshot.wires);
+        persistProject(snapshot.components, snapshot.wires, state.wireRoutingMode);
 
         return {
           components: JSON.parse(JSON.stringify(snapshot.components)),
@@ -1297,7 +1225,7 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
         const newIdx = state.historyIndex + 1;
         const snapshot = state.history[newIdx];
         const health = validateCircuitGraph(snapshot.components, snapshot.wires);
-        persistProject(snapshot.components, snapshot.wires);
+        persistProject(snapshot.components, snapshot.wires, state.wireRoutingMode);
 
         return {
           components: JSON.parse(JSON.stringify(snapshot.components)),
@@ -1314,7 +1242,7 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
     // Project Persistence & Safety
     saveProject: () => {
       const state = get();
-      persistProject(state.components, state.wires);
+      persistProject(state.components, state.wires, state.wireRoutingMode);
     },
 
     resetProjectToDefault: () => {
@@ -1326,7 +1254,8 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
       const state = get();
       return JSON.stringify(
         {
-          version: 2,
+          version: 3,
+          wireRoutingMode: state.wireRoutingMode,
           timestamp: Date.now(),
           components: state.components,
           wires: state.wires,
@@ -1340,8 +1269,10 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => {
       try {
         const parsed = JSON.parse(jsonStr);
         if (Array.isArray(parsed.components) && Array.isArray(parsed.wires)) {
-          const histUpdate = recordHistoryAndPersist(parsed.components, parsed.wires);
+          const wireRoutingMode = parsed.wireRoutingMode === 'curved' ? 'curved' : 'orthogonal';
+          const histUpdate = recordHistoryAndPersist(parsed.components, parsed.wires, wireRoutingMode);
           set({
+            wireRoutingMode,
             components: parsed.components,
             wires: parsed.wires,
             selectedComponentIds: [],

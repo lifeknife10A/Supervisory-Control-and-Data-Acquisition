@@ -96,9 +96,11 @@ def run_feeder(fault_mode="normal", rate_hz=4.0):
             )
             with urllib.request.urlopen(req, timeout=1.5) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
-                health = result.get("health", {})
-                status_class = health.get("status_class", 0)
-                label = health.get("label", "OK")
+                # Bridge v2.1+ returns a flat payload:
+                #   {"status_class", "health_label", "recommendation", "data_valid",
+                #    "actuator_commands": {...}}
+                status_class = result.get("status_class", 0)
+                label = result.get("health_label", "OK")
 
                 # Color formatting
                 badge = "\033[92m[OK]\033[0m" if status_class == 0 else ("\033[93m[WARN]\033[0m" if status_class == 1 else "\033[91m[TRIP]\033[0m")

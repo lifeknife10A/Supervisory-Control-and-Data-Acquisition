@@ -12,6 +12,7 @@ import { ACS712Model } from './ACS712Model';
 import { ResistorModel } from './ResistorModel';
 import { RelayModel } from './RelayModel';
 import { DS18B20Model } from './DS18B20Model';
+import { ledModelTransform } from './ledDimensions';
 
 interface DraggableComponentProps {
   component: WorkbenchComponent;
@@ -33,6 +34,17 @@ const GLBModel: React.FC<{ modelPath: string; scale?: [number, number, number] }
         mesh.castShadow = true;
         mesh.receiveShadow = true;
 
+        // Black fan plastic must not pass through the generic blue PCB fallback.
+        if (modelPath === '/models/fan.glb') {
+          mesh.material = new THREE.MeshStandardMaterial({
+            color: '#111111',
+            vertexColors: false,
+            metalness: 0,
+            roughness: 0.72,
+          });
+          return;
+        }
+
         if (Array.isArray(mesh.material)) {
           mesh.material = mesh.material.map((m) => m.clone());
         } else if (mesh.material) {
@@ -53,22 +65,38 @@ const GLBModel: React.FC<{ modelPath: string; scale?: [number, number, number] }
           }
 
           if (!isTooDark) {
+            // glTF stores COLOR_0 as straight sRGB bytes, but three.js reads
+            // vertex colors as LINEAR working-space values. Without converting,
+            // a medium-blue PCB (sRGB ~0.45) enters PBR math as ~0.45 linear
+            // (~0.71 sRGB) and renders pale/washed out. Convert once per
+            // geometry; geometry is shared across clones, so guard with a flag.
+            if (!mesh.geometry.userData.colorsConverted) {
+              const out = new Float32Array(colorAttr.count * 3);
+              const c = new THREE.Color();
+              for (let i = 0; i < colorAttr.count; i++) {
+                c.setRGB(colorAttr.getX(i), colorAttr.getY(i), colorAttr.getZ(i), THREE.SRGBColorSpace);
+                out[i * 3] = c.r;
+                out[i * 3 + 1] = c.g;
+                out[i * 3 + 2] = c.b;
+              }
+              mesh.geometry.setAttribute('color', new THREE.BufferAttribute(out, 3));
+              mesh.geometry.userData.colorsConverted = true;
+            }
             // Baked GLBs with no explicit <material> fall back to three.js's
             // GLTFLoader default (metalness:1, roughness:1), which is nearly
             // fully reflective and washes the baked vertex colors out to a
             // flat, bland grey under this scene's simple lighting (no HDRI
             // environment map). Force a low-metalness, mid-roughness PCB/
             // plastic-like response so the actual vertex colors read clearly.
-            // The MQ-2's sensing can is a low-poly grey dome that dominates the
-            // mesh - a brighter, shinier metal response reads much better than
-            // flat matte plastic and helps mask the faceted low-poly silhouette.
+            // The MQ-2's sensing can is a low-poly grey dome; a moderately
+            // metallic response reads as metal without desaturating the board.
             const isShinyMetalCan = modelPath.includes('mq2');
             const tuneMaterial = (m: THREE.Material) => {
               m.vertexColors = true;
               if (m instanceof THREE.MeshStandardMaterial) {
-                m.metalness = isShinyMetalCan ? 0.65 : Math.min(m.metalness, 0.25);
+                m.metalness = isShinyMetalCan ? 0.35 : Math.min(m.metalness, 0.25);
                 m.roughness = isShinyMetalCan
-                  ? 0.28
+                  ? 0.32
                   : Math.max(m.roughness > 0 && m.roughness < 1 ? m.roughness : 0.55, 0.4);
               }
               m.needsUpdate = true;
@@ -90,7 +118,7 @@ const GLBModel: React.FC<{ modelPath: string; scale?: [number, number, number] }
       }
     });
     return clone;
-  }, [scene]);
+  }, [scene, modelPath]);
 
   return <primitive object={clonedScene} scale={scale} />;
 };
@@ -484,11 +512,7 @@ export const DraggableComponent: React.FC<DraggableComponentProps> = ({ componen
           glowColor="#052e16"
           isLit={isLit}
           heightAxis="y"
-          leadLimit={0}
-          leadXStretch={10.3621608467}
-          leadStretchLimit={-4}
-          position={[0, 0.084, 0]}
-          scale={[0.003, 0.003, 0.003]}
+          {...ledModelTransform('green')}
         />
 
         {isSelected && (
@@ -578,9 +602,7 @@ export const DraggableComponent: React.FC<DraggableComponentProps> = ({ componen
           glowColor="#450a0a"
           isLit={isLit}
           heightAxis="y"
-          leadLimit={0.18}
-          position={[0, 0, 0]}
-          scale={[0.17, 0.17, 0.17]}
+          {...ledModelTransform('red')}
         />
 
         {isSelected && (

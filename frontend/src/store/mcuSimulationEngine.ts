@@ -2,6 +2,9 @@ import type { LiveTelemetry, SerialLogEntry } from '../types/workbench';
 import type { CircuitHealthReport } from './circuitValidator';
 import { DEVICE_DISCONNECTED_C } from '../constants/pinMapping';
 
+/** Shared scheduler interval for the illustrative process model (not circuit physics). */
+export const SIMULATION_TICK_MS = 300;
+
 export interface MCUState {
   bootEpoch: number;
   isBooted: boolean;
@@ -138,7 +141,7 @@ export function generateBootLogs(): SerialLogEntry[] {
       id: `boot_${Date.now()}_10`,
       timestamp: formatTime(0),
       level: 'INFO',
-      message: '[SCADA-CORE] Control Loop active (550ms tick). Type "help" in terminal for commands.',
+      message: `[SCADA-CORE] Control Loop active (${SIMULATION_TICK_MS}ms tick). Type "help" in terminal for commands.`,
     },
   ];
 }
@@ -151,7 +154,8 @@ export function executeMCUControlStep(
   mcuState: MCUState,
   logCounter: number,
   circuitHealth?: CircuitHealthReport,
-  controlMode: 'auto' | 'manual' | 'fault_injection' = 'auto'
+  controlMode: 'auto' | 'manual' | 'fault_injection' = 'auto',
+  advanceSimulation = true
 ): {
   updatedTelemetry: LiveTelemetry;
   updatedMCUState: MCUState;
@@ -162,8 +166,8 @@ export function executeMCUControlStep(
   const telemetry = { ...currentTelemetry };
   const state: MCUState = {
     ...mcuState,
-    uptimeSeconds: parseFloat((mcuState.uptimeSeconds + 0.55).toFixed(2)),
-    freeHeap: Math.max(250000, mcuState.freeHeap + Math.floor((Math.random() - 0.5) * 64)),
+    uptimeSeconds: parseFloat((mcuState.uptimeSeconds + (advanceSimulation ? SIMULATION_TICK_MS / 1000 : 0)).toFixed(2)),
+    freeHeap: advanceSimulation ? Math.max(250000, mcuState.freeHeap + Math.floor((Math.random() - 0.5) * 64)) : mcuState.freeHeap,
     gpioStates: { ...mcuState.gpioStates },
     modbusRegisters: { ...mcuState.modbusRegisters },
     modbusCoils: { ...mcuState.modbusCoils },
@@ -258,13 +262,13 @@ export function executeMCUControlStep(
     }
   }
 
-  // 2. Physical Simulation Dynamics (when sensors are connected)
+  // 2. Illustrative process dynamics (not electrical hardware simulation)
   const isTankConnected = !circuitHealth || circuitHealth.devices.tankLevelSensor.connected;
   const isTempConnected = !circuitHealth || circuitHealth.devices.tempSensor.connected;
   const isGasConnected = !circuitHealth || circuitHealth.devices.gasSensor.connected;
   const isCurrentConnected = !circuitHealth || circuitHealth.devices.currentSensor.connected;
 
-  if (isTankConnected) {
+  if (advanceSimulation && isTankConnected) {
     if (telemetry.pump_active) {
       telemetry.tank_level = Math.min(100, telemetry.tank_level + (0.55 + Math.random() * 0.3));
     } else {
@@ -276,7 +280,7 @@ export function executeMCUControlStep(
     }
   }
 
-  if (isCurrentConnected) {
+  if (advanceSimulation && isCurrentConnected) {
     if (telemetry.pump_active) {
       if (telemetry.current_draw < 3.5) {
         telemetry.current_draw = parseFloat((1.6 + Math.random() * 0.25).toFixed(2));
@@ -286,11 +290,11 @@ export function executeMCUControlStep(
     }
   }
 
-  if (isTempConnected && telemetry.temperature !== DEVICE_DISCONNECTED_C) {
+  if (advanceSimulation && isTempConnected && telemetry.temperature !== DEVICE_DISCONNECTED_C) {
     telemetry.temperature = parseFloat((telemetry.temperature + (Math.random() - 0.49) * 0.18).toFixed(1));
   }
 
-  if (isGasConnected) {
+  if (advanceSimulation && isGasConnected) {
     telemetry.gas_ppm = parseFloat(Math.max(10, telemetry.gas_ppm + (Math.random() - 0.51) * 1.5).toFixed(1));
   }
 
@@ -320,7 +324,7 @@ export function executeMCUControlStep(
   let desiredFan = telemetry.fan_active;
 
   if (controlMode === 'auto') {
-    if (criticalSafetyTrip) {
+    if (criticalSafetyTrip || sensorFault) {
       // General Critical Safety Trip: Feed Pump MUST immediately trip OFF!
       desiredPump = false;
       if (highTankAlarm) desiredValve = true;
@@ -342,10 +346,10 @@ export function executeMCUControlStep(
     }
   } else if (controlMode === 'manual') {
     // Hard physical safety overrides manual control during destructive overcurrent, tank overflow, or dry-run cavitation risk
-    if (overCurrentTrip || highTankAlarm || criticalGasTrip || criticalDryRun) {
+    if (criticalSafetyTrip || sensorFault) {
       desiredPump = false;
       if (highTankAlarm) desiredValve = true;
-      if (criticalGasTrip) desiredFan = true;
+      if (criticalGasTrip || overTempTrip) desiredFan = true;
     }
   }
 

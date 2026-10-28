@@ -32,9 +32,9 @@ export const ActuatorEffects: React.FC = () => {
               <mesh key={i} rotation={[0, 0, (i * Math.PI) / 2]}>
                 <boxGeometry args={[0.04, 0.18, 0.008]} />
                 <meshStandardMaterial
-                  color="#334155"
-                  roughness={0.4}
-                  metalness={0.2}
+                  color="#111111"
+                  roughness={0.72}
+                  metalness={0}
                 />
               </mesh>
             ))}
