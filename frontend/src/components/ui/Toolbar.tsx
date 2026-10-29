@@ -15,7 +15,8 @@ import {
   Terminal,
   Cpu,
   Zap,
-  Activity
+  Activity,
+  BrainCircuit
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/workbenchStore';
 
@@ -40,6 +41,9 @@ interface ToolbarProps {
   showTelemetry: boolean;
   onToggleCircuitDashboard?: () => void;
   showCircuitDashboard?: boolean;
+  onTogglePredictive?: () => void;
+  showPredictive?: boolean;
+  activeAlertCount?: number;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -47,7 +51,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onToggleTelemetry,
   showTelemetry,
   onToggleCircuitDashboard,
-  showCircuitDashboard
+  showCircuitDashboard,
+  onTogglePredictive,
+  showPredictive,
+  activeAlertCount = 0
 }) => {
   const selectedComponentIds = useWorkbenchStore((s) => s.selectedComponentIds);
   const rotateSelectedComponent = useWorkbenchStore((s) => s.rotateSelectedComponent);
@@ -499,6 +506,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             >
               <Zap className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Circuit</span>
+            </button>
+          )}
+
+          {/* Predictive Analytics Panel Toggle (ML predictions & alerts from the bridge) */}
+          {onTogglePredictive && (
+            <button
+              onClick={onTogglePredictive}
+              title="Toggle Predictive Analytics (anomalies, fault diagnosis, pump health, forecasts)"
+              className={`relative flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition font-medium ${
+                showPredictive
+                  ? 'bg-violet-50 text-violet-700 border-violet-300 font-bold'
+                  : 'text-gray-600 hover:bg-gray-100 border-gray-200'
+              }`}
+            >
+              <BrainCircuit className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Predict</span>
+              {activeAlertCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center">
+                  {activeAlertCount}
+                </span>
+              )}
             </button>
           )}
 

@@ -2,6 +2,7 @@
 import unittest
 from fastapi.testclient import TestClient
 from backend import server
+from backend.ml_engine import MLEngine
 
 NORMAL = dict(tank_level=54.2, temperature=29.4, gas_ppm=22.0, current_draw=1.65)
 
@@ -12,7 +13,7 @@ class BridgeTests(unittest.TestCase):
         server.scada_state.update(server.initial_state())
         server.fan_required = False
         server.connected_websockets.clear()
-        server.rate_tracker.reset()
+        server.ml_engine = MLEngine("sim")  # no models, no event log on disk
         server.telemetry_logger = None
         self.client = TestClient(server.app, raise_server_exceptions=False)
 

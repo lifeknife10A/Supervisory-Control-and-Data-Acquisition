@@ -55,10 +55,12 @@ Open a terminal in `Mini Project` and run:
 cd backend
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt
-./venv/bin/python train_anomaly_model.py   # add --csv data/telemetry_log.csv once you have logged history
+./venv/bin/python train_models.py            # ~5 min; trains the sim + rig profiles on sample data
 ./venv/bin/python -m uvicorn server:app --reload --port 8000
+# Real hardware: SCADA_PLANT_PROFILE=rig ./venv/bin/python -m uvicorn server:app --port 8000
 ```
 Backend will be live at `http://localhost:8000` (API Docs at `http://localhost:8000/docs`).
+Without trained models the bridge still runs; predictions that need a model show as unavailable.
 
 ### Step 2: Start the React Web HMI
 In a second terminal, run:
@@ -105,11 +107,49 @@ Any register reading `32767` (`0x7FFF`) means its sensor is faulty, missing or (
 
 ---
 
-## 🤖 Machine Learning Diagnostic States
+## 🛡️ Rule-Based Safety States (deterministic, `backend/process_policy.py`)
 
 * **Class 0: `HEALTHY` (Green)** — Normal steady-state operation within standard envelopes.
-* **Class 1: `WARNING / DRIFT` (Amber)** — Early precursor detected (motor current drag, thermal elevation, slight gas drift).
-* **Class 2: `CRITICAL FAULT` (Red)** — Safety threshold exceeded (gas leak >250 PPM, temperature >70°C, motor lock >3.8A, or tank dry-run/overflow).
+* **Class 1: `WARNING` (Amber)** — Tank ≥78% or ≤25%, gas ≥80 PPM, temperature ≥50°C, or current ≥2.8A.
+* **Class 2: `CRITICAL TRIP` (Red)** — Tank ≥88%, gas ≥250 PPM, temperature ≥70°C, or current ≥3.8A. Pump interlocked off.
+
+These rules alone drive the interlocks. The ML layer below is **advisory**: it adds alerts and
+diagnosis but can never switch an actuator.
+
+---
+
+## 🤖 Predictive Analytics & ML (advisory, `backend/ml_engine.py`)
+
+| Model | Algorithm | Input | Output |
+| :--- | :--- | :--- | :--- |
+| Anomaly detection | Per-mode robust covariance envelope **+ Isolation Forest** | Pump current, tank/temperature rates (envelope); all 8 signals (forest) | Scores; anomaly flag if either fires |
+| Fault classification | Random Forest | 24-sample window statistics | One of 9 classes: normal, gas leak, overheating, dry run, line blockage, motor overload, tank leak, stuck relay, valve stuck |
+| Pump health | Gradient Boosting regressor | Current mean/ripple, fill rate, fill per amp, supply voltage while pumping | Health index 0–100 (GOOD / DEGRADING / SERVICE SOON) |
+| MQ-2 calibration | Gradient Boosting regressor (datasheet formula fallback) | Raw MQ-2 mV, BME280 temperature & humidity | Temperature/humidity-compensated PPM |
+| Forecast | Linear trend over ~60 samples | Tank, temperature, gas | Value in 60 s, time to warning/trip limit |
+
+**Alerts.** Every detection (anomaly, fault class ≥60% confidence, pump health <40%, forecast trip
+<120 s, rule warnings/trips, invalid telemetry) becomes an alert after 4 consecutive samples
+(trips and invalid data: immediately) and clears after 8 clean samples. Alerts appear as pop-ups
+in the web HMI and in the **Predict** panel, are appended to the recommendation text LabVIEW
+receives, and every raise/clear is written to `backend/data/events.csv`. Per-sample predictions are
+logged to `backend/data/telemetry_log.csv`. APIs: `GET /api/predictions`, `GET /api/alerts`.
+
+**Training data.** No public dataset matches this rig, so models are trained on a datasheet-grounded
+plant simulator (`backend/synthetic_plant.py`): ACS712-05B noise, DS18B20 resolution, HC-SR04
+accuracy, the MQ-2 LPG curve `ppm = 574.25·(Rs/R0)^−2.222` (MQUnifiedsensor fit of the Hanwei
+datasheet) and an approximate reading of the datasheet's temperature/humidity figure. Two plant
+profiles exist: `sim` (3D workbench and feeder sim, ~1.6 A pump) and `rig` (BOM mini pump,
+~0.1–0.5 A). `train_models.py` prints and saves an evaluation report per profile
+(`backend/models/<profile>/report.json`).
+
+**Moving to the real rig.** Run the bridge with `SCADA_PLANT_PROFILE=rig`, log a few normal
+fill/drain cycles, then retrain so the models learn *your* tank and pump:
+`python train_models.py --profile rig --csv data/telemetry_log.csv`. For gas calibration against a
+reference meter, add `--gas-csv` with columns `gas_sensor_mv, ambient_temp, humidity, reference_ppm`.
+
+**Feeder sim faults** for demoing every model without hardware:
+`python labview_feeder_sim.py --fault {gas,temp,tank,dry_run,blockage,overload,leak,stuck_relay,valve_stuck} [--wear 0.8]`.
 
 ---
 

@@ -11,14 +11,21 @@ import { CircuitSchematicModal } from './components/ui/CircuitSchematicModal';
 import { JsonMonitorModal } from './components/ui/JsonMonitorModal';
 import { DestructiveConfirmModal } from './components/ui/DestructiveConfirmModal';
 import { CircuitSimulationDashboard } from './components/ui/CircuitSimulationDashboard';
+import { PredictiveAnalyticsPanel } from './components/ui/PredictiveAnalyticsPanel';
+import { MLAlertToaster } from './components/ui/MLAlertToaster';
 import { useWorkbenchStore } from './store/workbenchStore';
-import { Layers, HelpCircle, Cable, RotateCw, Activity, ShieldCheck, Box, ArrowUp, ArrowDown } from 'lucide-react';
+import { useBackendPredictions } from './hooks/useBackendPredictions';
+import { BACKEND_URL } from './constants/backend';
+import { Layers, HelpCircle, Cable, RotateCw, Activity, ShieldCheck, Box, ArrowUp, ArrowDown, BrainCircuit } from 'lucide-react';
 
 export function App() {
   const isSerialMonitorOpen = useWorkbenchStore((s) => s.isSerialMonitorOpen);
   const setSerialMonitorOpen = useWorkbenchStore((s) => s.setSerialMonitorOpen);
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [showCircuitDashboard, setShowCircuitDashboard] = useState(false);
+  const [showPredictive, setShowPredictive] = useState(false);
+  // Always polled so alerts pop up whichever panel is open; event history only while visible.
+  const backend = useBackendPredictions(showPredictive);
 
   const isSimulating = useWorkbenchStore((s) => s.isSimulating);
   const tickMCU = useWorkbenchStore((s) => s.tickMCU);
@@ -38,7 +45,7 @@ export function App() {
     if (!isSimulating) return;
     // The bridge rejects unknown fields (e.g. the locally computed status_class), so send only what it accepts.
     const { tank_level, temperature, gas_ppm, current_draw, pump_active, valve_open, fan_active } = telemetry;
-    fetch('http://localhost:8000/api/telemetry', {
+    fetch(`${BACKEND_URL}/api/telemetry`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tank_level, temperature, gas_ppm, current_draw, pump_active, valve_open, fan_active }),
@@ -57,6 +64,18 @@ export function App() {
   const toggleCatalog = useWorkbenchStore((s) => s.toggleCatalog);
   const circuitHealth = useWorkbenchStore((s) => s.circuitHealth);
   const setCircuitHealthModalOpen = useWorkbenchStore((s) => s.setCircuitHealthModalOpen);
+  const setCatalogOpen = useWorkbenchStore((s) => s.setCatalogOpen);
+
+  // The predictive panel shares the right edge with the circuit dashboard and the catalog,
+  // so it hides while the catalog drawer is open.
+  const predictiveVisible = showPredictive && !isCatalogOpen;
+  const togglePredictive = () => {
+    if (!predictiveVisible) {
+      setShowCircuitDashboard(false);
+      setCatalogOpen(false);
+    }
+    setShowPredictive(!predictiveVisible);
+  };
 
   const isMulti = selectedIds.length > 1;
   const singleComp = selectedIds.length === 1 ? components.find((c) => c.id === selectedIds[0]) : null;
@@ -137,8 +156,14 @@ export function App() {
         onOpenExport={() => setSerialMonitorOpen(true)}
         onToggleTelemetry={() => setShowTelemetry(!showTelemetry)}
         showTelemetry={showTelemetry}
-        onToggleCircuitDashboard={() => setShowCircuitDashboard(!showCircuitDashboard)}
+        onToggleCircuitDashboard={() => {
+          if (!showCircuitDashboard) setShowPredictive(false);
+          setShowCircuitDashboard(!showCircuitDashboard);
+        }}
         showCircuitDashboard={showCircuitDashboard}
+        onTogglePredictive={togglePredictive}
+        showPredictive={predictiveVisible}
+        activeAlertCount={backend.alerts.length}
       />
 
       {/* 3. Right Component Catalog (Collapsible Drawer with drag-and-drop) */}
@@ -155,6 +180,10 @@ export function App() {
 
       {/* 6b. Circuit Simulation Dashboard on Right */}
       {showCircuitDashboard && <CircuitSimulationDashboard onClose={() => setShowCircuitDashboard(false)} />}
+
+      {/* 6c. Predictive Analytics (bridge ML) on Right + alert toasts everywhere */}
+      {predictiveVisible && <PredictiveAnalyticsPanel data={backend} onClose={() => setShowPredictive(false)} />}
+      <MLAlertToaster alerts={backend.alerts} onOpenPanel={() => !predictiveVisible && togglePredictive()} />
 
       {/* 7. ESP32 Firmware & Serial Studio Modal */}
       <SerialMonitorModal
@@ -358,6 +387,22 @@ export function App() {
         >
           <Activity className="w-4 h-4" />
           <span className="text-[10px] font-medium">Simulation</span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (!predictiveVisible) setShowTelemetry(false);
+            togglePredictive();
+          }}
+          className={`relative flex flex-col items-center space-y-0.5 ${
+            predictiveVisible ? 'text-violet-600 font-bold' : 'text-slate-600 hover:text-violet-600'
+          }`}
+        >
+          <BrainCircuit className="w-4 h-4" />
+          <span className="text-[10px] font-medium">Predict</span>
+          {backend.alerts.length > 0 && (
+            <span className="absolute -top-1 right-0 w-2 h-2 rounded-full bg-red-600" />
+          )}
         </button>
       </nav>
     </div>
