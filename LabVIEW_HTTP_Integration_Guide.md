@@ -65,3 +65,21 @@ To write commands back to the virtual plant from LabVIEW:
 * Use **`Write Single Coil.vi`** (Function Code 05):
   - Address `0`: `TRUE` to start Pump, `FALSE` to stop Pump.
   - Address `1`: `TRUE` to open Safety Valve, `FALSE` to close Safety Valve.
+
+---
+
+## 4. Wi-Fi Gateway Loop (ESP32 `scada_master_firmware`)
+
+The Wi-Fi firmware serves HTTP JSON instead of Modbus. Each loop iteration makes three calls:
+
+1. **GET** `<ESP32>/api/telemetry` → response string (`{"level_cm":..,"water_temp_c":..,...}`).
+2. **POST** that string **unchanged** to `http://127.0.0.1:8000/api/telemetry`. No Unflatten/Flatten
+   needed: the bridge detects the ESP32 format and converts it (distance → tank %, MQ-2 volts → ppm).
+3. Unflatten the reply with a cluster of `status_class` (I32), `health_label` (string),
+   `recommendation` (string), `data_valid` (boolean), `control_query` (string), then
+   **GET** `<ESP32>/api/control?` + `control_query` (e.g. `pump=0&valve=1&fan=1`) to apply the
+   interlocked commands.
+
+`<ESP32>` is `http://192.168.4.1` (the firmware's Wi-Fi access point). Set the tank geometry before
+starting the bridge: `SCADA_TANK_EMPTY_CM` (sensor distance when empty, default 30) and
+`SCADA_TANK_FULL_CM` (distance when full, default 5).

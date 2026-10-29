@@ -54,8 +54,9 @@ const float V_REF = 3.3f;
 const float ADC_RES = 4095.0f;
 const float MQ2_DIVIDER_RATIO = 2.0f;
 const float VOLT_SENSOR_RATIO = 5.0f;
-const float ACS712_ZERO_V = 2.5f;
+const float ACS712_NOMINAL_ZERO_V = 2.5f;   // Fallback if the boot calibration is implausible
 const float ACS712_SENSITIVITY = 0.185f;
+float acs712ZeroV = ACS712_NOMINAL_ZERO_V;    // Measured at boot with the pump off
 
 // Operational States
 bool pumpState = false;
@@ -97,11 +98,30 @@ float readGasVolts() {
   return (raw / ADC_RES) * V_REF * MQ2_DIVIDER_RATIO;
 }
 
+// Averaged reading using the ESP32's factory ADC calibration (raw/4095*3.3 reads ~0.25 V low near 2.5 V)
+float readCurrentSensorVolts(int samples) {
+  uint32_t total = 0;
+  for (int i = 0; i < samples; i++) total += analogReadMilliVolts(PIN_ADC_CURRENT);
+  return total / (float)samples / 1000.0f;
+}
+
+// Must run with the pump relay OFF: whatever the ACS712 outputs now is 0 A
+void calibrateCurrentZero() {
+  delay(100); // Let the relay and sensor output settle
+  float zero = readCurrentSensorVolts(256);
+  if (zero > 1.5f && zero < 3.0f) {
+    acs712ZeroV = zero;
+    Serial.printf("ACS712 zero calibrated: %.3f V
+", zero);
+  } else {
+    Serial.printf("ACS712 zero %.3f V implausible (sensor unplugged?), using %.2f V
+", zero, ACS712_NOMINAL_ZERO_V);
+  }
+}
+
 float readPumpCurrent() {
-  int raw = analogRead(PIN_ADC_CURRENT);
-  float volts = (raw / ADC_RES) * V_REF;
-  float amps = (volts - ACS712_ZERO_V) / ACS712_SENSITIVITY;
-  if (abs(amps) < 0.08f) amps = 0.0f;
+  float amps = (readCurrentSensorVolts(16) - acs712ZeroV) / ACS712_SENSITIVITY;
+  if (amps < 0.08f) amps = 0.0f; // DC pump only draws one way; also removes noise around zero
   return amps;
 }
 
@@ -231,6 +251,7 @@ void setup() {
   digitalWrite(PIN_US_TRIG, LOW);
 
   analogSetAttenuation(ADC_11db);
+  calibrateCurrentZero(); // Relays were switched OFF above
 
   // Initialize I2C Bus with anti-lock timeout
   Wire.begin(21, 22);

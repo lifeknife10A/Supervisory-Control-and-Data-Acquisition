@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -17,12 +18,14 @@ try:
     from .process_policy import (ACTUATORS, OPTIONAL_RANGES, SENSOR_RANGES, UNKNOWN,
                                  normalize_payload, evaluate_process_health)
     from .alerts import EventLog
+    from .esp32_adapter import control_query, from_esp32, is_esp32_payload
     from .ml_engine import MLEngine
     from .telemetry_logger import TelemetryLogger
 except ImportError:  # uvicorn server:app / LabVIEW script directory
     from process_policy import (ACTUATORS, OPTIONAL_RANGES, SENSOR_RANGES, UNKNOWN,
                                 normalize_payload, evaluate_process_health)
     from alerts import EventLog
+    from esp32_adapter import control_query, from_esp32, is_esp32_payload
     from ml_engine import MLEngine
     from telemetry_logger import TelemetryLogger
 
@@ -62,6 +65,10 @@ scada_state = initial_state()
 connected_websockets = []
 # Safety demand is independent of manual/reported fan state.
 fan_required = False
+# Operator commands from /api/control, held until the plant reports them applied or they expire,
+# so a LabVIEW/ESP32 loop that reports its own actuator state does not overwrite them.
+MANUAL_HOLD_S = 10.0
+manual_commands = {}  # actuator -> (value, monotonic expiry)
 telemetry_logger = _csv_target("SCADA_TELEMETRY_LOG", TelemetryLogger)
 # Advisory ML only: its output never feeds enforce_safety or status_class.
 ml_engine = MLEngine.load(event_log=_csv_target("SCADA_EVENT_LOG", EventLog))
@@ -84,6 +91,15 @@ def enforce_safety(state):
         state["valve_open"] = True
     if fan_required:
         state["fan_active"] = True
+
+
+def apply_manual_commands(state, reported):
+    now = time.monotonic()
+    for name, (value, expires) in list(manual_commands.items()):
+        if now > expires or reported.get(name) == value:
+            del manual_commands[name]
+        else:
+            state[name] = value
 
 
 def mark_unknown():
@@ -200,6 +216,7 @@ async def ingest_telemetry(parsed):
     elif gas < 45:
         fan_required = False
         state["fan_active"] = False
+    apply_manual_commands(state, values)
     enforce_safety(state)
     state["timestamp"] = datetime.now(timezone.utc).isoformat()
     scada_state.update(state)
@@ -214,7 +231,18 @@ async def post_telemetry(request: Request):
         parsed = json.loads((await request.body()).decode("utf-8"))
     except (ValueError, UnicodeError):
         return JSONResponse(await invalid_telemetry())
-    return JSONResponse(await ingest_telemetry(parsed))
+    if not is_esp32_payload(parsed):
+        return JSONResponse(await ingest_telemetry(parsed))
+    # Raw ESP32 gateway JSON forwarded by LabVIEW: convert it, and hand back the commands
+    # (fail-safe ones too) as a ready-made query for the ESP32's /api/control.
+    try:
+        converted = from_esp32(parsed)
+    except ValueError:
+        result = await invalid_telemetry()
+    else:
+        result = await ingest_telemetry(converted)
+    result["control_query"] = control_query(result["actuator_commands"])
+    return JSONResponse(result)
 
 
 @app.post("/api/control")
@@ -225,6 +253,8 @@ async def post_control(cmd: ControlCommand):
                              "recommendation": "Supply at least one boolean actuator command.",
                              "data_valid": False}, status_code=422)
     scada_state.update(requested)
+    expires = time.monotonic() + MANUAL_HOLD_S
+    manual_commands.update({name: (value, expires) for name, value in requested.items()})
     enforce_safety(scada_state)
     scada_state["timestamp"] = datetime.now(timezone.utc).isoformat()
     snapshot = dict(scada_state)
