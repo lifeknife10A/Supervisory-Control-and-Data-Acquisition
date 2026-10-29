@@ -26,7 +26,7 @@
 |:---|:---|:---:|:---|:---|
 | **Board A Left Red (+)** | Far Left Rail (+) | **+5.0V DC Main Bus** | ESP32 `VIN` (Board A: Row 15 Col i) | HC-SR04 VCC, MQ-2 VCC, ACS712 VCC, Relay VCC, 16x2 LCD VCC |
 | **Board A Left Blue (-)** | Far Left Rail (-) | **0V System Ground** | ESP32 `GND` (Board A: Row 14 Col i) | Common Ground reference |
-| **Board B Right Red (+)** | Far Right Rail (+) | **+3.3V DC Logic Bus** | ESP32 `3V3` (Board B: Row 15 Col b) | GYBM (BME280) VCC, DS18B20 VDD, Pull-up resistors |
+| **Board B Right Red (+)** | Far Right Rail (+) | **+3.3V DC Logic Bus** | ESP32 `3V3` (Board B: Row 15 Col b) | DS18B20 VDD, Pull-up resistors |
 | **Board B Right Blue (-)** | Far Right Rail (-) | **0V System Ground** | Bridged from Board A Blue Rail | Common Ground reference |
 
 ---
@@ -62,10 +62,10 @@
 | Row # | Pin Silkscreen | Occupied Socket | Primary Access Hole | Electrical Role & Subsystem | Target Destination | Status |
 |:---:|:---|:---:|:---:|:---|:---|:---:|
 | **1** | `D23` (GPIO 23) | Board B: 1a | Board B: 1b | Digital Output | Green Status Indicator LED (220Ω) | ASSIGNED (Indicator) |
-| **2** | `D22` (GPIO 22) | Board B: 2a | Board B: 2b | I2C Hardware Clock (`SCL`) | 16x2 LCD HW-61 & GYBM SCL | ASSIGNED (I2C Bus) |
+| **2** | `D22` (GPIO 22) | Board B: 2a | Board B: 2b | I2C Hardware Clock (`SCL`) | 16x2 LCD Display (HW-61) SCL | **VERIFIED (I2C Bus)** |
 | **3** | `TX0` (GPIO 1) | Board B: 3a | Board B: 3b | UART0 Programming Transmit | Kept free for USB flashing | **PROTECTED (Free)** |
 | **4** | `RX0` (GPIO 3) | Board B: 4a | Board B: 4b | UART0 Programming Receive | Kept free for USB flashing | **PROTECTED (Free)** |
-| **5** | `D21` (GPIO 21) | Board B: 5a | Board B: 5b | I2C Hardware Data (`SDA`) | 16x2 LCD HW-61 & GYBM SDA | ASSIGNED (I2C Bus) |
+| **5** | `D21` (GPIO 21) | Board B: 5a | Board B: 5b | I2C Hardware Data (`SDA`) | 16x2 LCD Display (HW-61) SDA | **VERIFIED (I2C Bus)** |
 | **6** | `D19` (GPIO 19) | Board B: 6a | Board B: 6b | VSPI MISO / Digital GPIO | Free | UNUSED |
 | **7** | `D18` (GPIO 18) | Board B: 7a | Board B: 7b | VSPI SCK / Digital GPIO | Free | UNUSED |
 | **8** | `D5` (GPIO 5) | Board B: 8a | Board B: 8b | VSPI CS / Strapping Pin | Free | UNUSED |
@@ -103,31 +103,64 @@
 | `R-2.2` | Sensor 2: 15 kΩ Resistor | *Brown-Green-Orange* | **15 kΩ (Brown-Green-Orange)** | Passive | Board B: Row 23 Col e | Board B: Row 24 Col e | **VERIFIED (Active)** |
 | `W-2.4` | Sensor 2: Divider Ground | **BLUE** / **BLACK** | **GREY** | M-M | Board B: Row 24 Col d | Board B: Right Blue Rail (GND) | **VERIFIED (Active)** |
 | `W-2.5` | Sensor 2: Stepped AO (2.5V) | **ORANGE** / Any | **WHITE** | M-M | Board B: Row 23 Col c (2.5V Node) | Board A: Row 6 Col i (GPIO 32) | **VERIFIED (Active)** |
-| `W-3.1` | Sensor 3: GYBM VCC (3.3V) | **RED** / Any | **RED** | F-M | GYBM `VCC` Pin | Board B: Right Red Rail (+3.3V) | **VERIFIED (Active)** |
-| `W-3.2` | Sensor 3: GYBM GND | **BLACK** / **BLUE** | **PURPLE** | F-M | GYBM `GND` Pin | Board B: Right Blue Rail (GND) | **VERIFIED (Active)** |
-| `W-3.3` | Sensor 3: GYBM SCL | **YELLOW** / Any | **YELLOW** | F-M | GYBM `SCL` Pin | Board B: Row 2 Col b (GPIO 22 / SCL) | **VERIFIED (Active)** |
-| `W-3.4` | Sensor 3: GYBM SDA | **GREEN** / Any | **GREEN** | F-M | GYBM `SDA` Pin | Board B: Row 5 Col b (GPIO 21 / SDA) | **VERIFIED (Active)** |
-| `W-4.1` | Sensor 4: Voltage Sensor S | **BLUE** / Any | **WHITE** | F-M | 10123W150075 `S` Pin | Board A: Row 5 Col i (GPIO 35 / D35) | **VERIFIED (Active)** |
-| `W-4.2` | Sensor 4: Voltage Sensor - | **BLACK** / **BLUE** | **BLACK** | F-M | 10123W150075 `-` Pin | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
-| `W-5.1` | Sensor 5: DS18B20 VDD (3.3V) | **RED** | Soldered & Ready | Wire/F-M | DS18B20 RED Lead | Board B: Right Red Rail (+3.3V) | **SOLDERING COMPLETE (Ready to Plug)** |
-| `W-5.2` | Sensor 5: DS18B20 GND | **BLACK** | Soldered & Ready | Wire/F-M | DS18B20 BLACK Lead | Board B: Right Blue Rail (GND) | **SOLDERING COMPLETE (Ready to Plug)** |
-| `W-5.3` | Sensor 5: DS18B20 DATA | **YELLOW** / Any | Soldered & Ready | Wire/F-M | DS18B20 DATA Lead | Board B: Row 11 Col b (GPIO 4 / D4) | **SOLDERING COMPLETE (Ready to Plug)** |
-| `R-5.1` | Sensor 5: 4.7 kΩ Pull-up | *Yellow-Violet-Red* | Available | Passive | Board B: Row 11 Col c | Board B: Right Red Rail (+3.3V) | Pending Insertion |
+| `W-4.1` | Sensor 3: Voltage Sensor S | **BLUE** / Any | **WHITE** | F-M | 10123W150075 `S` Pin | Board A: Row 5 Col i (GPIO 35 / D35) | **VERIFIED (Active)** |
+| `W-4.2` | Sensor 3: Voltage Sensor - | **BLACK** / **BLUE** | **BLACK** | F-M | 10123W150075 `-` Pin | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
+| `W-5.1` | Sensor 4: DS18B20 VDD (3.3V) | **RED** | **RED** | Wire | DS18B20 RED Lead | Board B: Right Red Rail (+3.3V) | **VERIFIED (Active)** |
+| `W-5.2` | Sensor 4: DS18B20 GND | **BLACK** | **BLACK** | Wire | DS18B20 BLACK Lead | Board B: Right Blue Rail (GND) | **VERIFIED (Active)** |
+| `W-5.3` | Sensor 4: DS18B20 DATA | **YELLOW** / Any | **YELLOW** | Wire | DS18B20 YELLOW Lead | Board B: Row 11 Col b (GPIO 4 / D4) | **VERIFIED (Active)** |
+| `R-5.1` | Sensor 4: 4.7 kΩ Pull-up | *Yellow-Violet-Red* | **4.7 kΩ (Yellow-Violet-Red)** | Passive | Board B: Row 11 Col c | Board B: Right Red Rail (+3.3V) | **VERIFIED (Active)** |
 | `W-6.1` | HMI: 16x2 LCD VCC | **RED** | **RED** (Board B +3.3V Rail) | F-M | HW-61 `VCC` Pin | Board B: Right Red Rail (+3.3V) | **VERIFIED (Active)** |
 | `W-6.2` | HMI: 16x2 LCD GND | **BLACK** / **BLUE** | **BROWN** | F-M | HW-61 `GND` Pin | Board B: Right Blue Rail (GND) | **VERIFIED (Active)** |
 | `W-6.3` | HMI: 16x2 LCD SDA | **GREEN** / Any | **WHITE** | F-M | HW-61 `SDA` Pin | Board B: Row 5 Col c (GPIO 21 / SDA) | **VERIFIED (Active)** |
 | `W-6.4` | HMI: 16x2 LCD SCL | **YELLOW** / Any | **ORANGE** | F-M | HW-61 `SCL` Pin | Board B: Row 2 Col c (GPIO 22 / SCL) | **VERIFIED (Active)** |
-| `W-7.1` | Sensor 6: ACS712 VCC (+5V) | **RED** | **GREEN** | F-M | ACS712 `VCC` Pin | Board A: Left Red Rail (+5V) | **VERIFIED (Active)** |
-| `W-7.2` | Sensor 6: ACS712 GND | **BLACK** / **BLUE** | **BROWN** | F-M | ACS712 `GND` Pin | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
-| `W-7.3` | Sensor 6: ACS712 OUT | **YELLOW** / Any | **WHITE** | F-M | ACS712 `OUT` Pin | Board A: Row 7 Col i (GPIO 33 / D33) | **VERIFIED (Active)** |
-| `W-8.1` | Actuator 1: Relay VCC (+5V) | **RED** | **PURPLE** | F-M | CW-020 `VCC` / `DC+` Pin | Board A: Left Red Rail (+5V) | **VERIFIED (Active)** |
-| `W-8.2` | Actuator 1: Relay GND | **BLACK** / **BLUE** | **BROWN** | F-M | CW-020 `GND` / `DC-` Pin | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
-| `W-8.3` | Actuator 1: Relay IN | **BLUE** / Any | **GREEN** | F-M | CW-020 `IN` Pin | Board A: Row 9 Col i (GPIO 26 / D26) | **VERIFIED (Active)** |
+| `W-7.1` | Sensor 5: ACS712 VCC (+5V) | **RED** | **GREEN** | F-M | ACS712 `VCC` Pin | Board A: Left Red Rail (+5V) | **VERIFIED (Active)** |
+| `W-7.2` | Sensor 5: ACS712 GND | **BLACK** / **BLUE** | **BROWN** | F-M | ACS712 `GND` Pin | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
+| `W-7.3` | Sensor 5: ACS712 OUT | **YELLOW** / Any | **WHITE** | F-M | ACS712 `OUT` Pin | Board A: Row 7 Col i (GPIO 33 / D33) | **VERIFIED (Active)** |
+| `W-8.1` | Actuator: 4-Ch Relay VCC (+5V) | **RED** | **PURPLE** | F-M | 4-Ch Relay `VCC` Pin | Board A: Left Red Rail (+5V) | **VERIFIED (Active)** |
+| `W-8.2` | Actuator: 4-Ch Relay GND | **BLACK** / **BLUE** | **BROWN** | F-M | 4-Ch Relay `GND` Pin | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
+| `W-8.3` | Actuator: Relay IN1 (Pump) | **BLUE** / Any | **GREEN** | F-M | 4-Ch Relay `IN1` Pin | Board A: Row 9 Col i (GPIO 26 / D26) | **VERIFIED (Active)** |
+| `W-8.4` | Actuator: Relay IN2 (Valve) | **YELLOW** / Any | **ORANGE** | F-M | 4-Ch Relay `IN2` Pin | Board A: Row 10 Col i (GPIO 27 / D27) | **VERIFIED (Active)** |
+| `W-8.5` | Actuator: Relay IN3 (Fan) | **WHITE** / Any | **GREY** | F-M | 4-Ch Relay `IN3` Pin | Board A: Row 11 Col i (GPIO 14 / D14) | **VERIFIED (Active)** |
 | `W-9.1` | Indicator: Green Signal Jumper | **GREEN** / Any | **GREEN** | M-M | Board B: Row 1 Col b (D23) | Board B: Row 26 Col b | **VERIFIED (Active)** |
 | `LED-1` | Indicator: Green Status LED | **GREEN LED** | **GREEN LED** | LED | Anode (+) in Board B: Row 26 Col c | Cathode (-) in Board B: Row 27 Col c | **VERIFIED (Active)** |
 | `R-LED1` | Indicator: Green 390Ω Resistor | *Orange-White-Brown* | **390 Ω (Orange-White-Brown)** | Passive | Board B: Row 27 Col d | Board B: Right Blue Rail (GND) | **VERIFIED (Active)** |
 | `W-9.2` | Indicator: Red Signal Jumper | **RED** / Any | **M-M Jumper** | M-M | Board A: Row 13 Col i (D13) | Board A: Row 26 Col i | **VERIFIED (Active)** |
 | `LED-2` | Indicator: Red Alarm LED | **RED LED** | **RED LED** | LED | Anode (+) in Board A: Row 26 Col h | Cathode (-) in Board A: Row 27 Col h | **VERIFIED (Active)** |
 | `R-LED2` | Indicator: Red 390Ω Resistor | *Orange-White-Brown* | **390 Ω (Orange-White-Brown)** | Passive | Board A: Row 27 Col g | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
-| `PWR-1` | 12V DC Barrel Jack (+12V) | **RED** | **RED (Tested +12V)** | Soldered | DC Jack Center Pin Tab | 12V Power Bus / Screw Terminal | **VERIFIED (Active)** |
-| `PWR-2` | 12V DC Barrel Jack (GND) | **BLACK** | **BLACK (Tested GND)** | Soldered | DC Jack Sleeve Leaf Tab | 12V Return / Common Ground | **VERIFIED (Active)** |
+| `PWR-1` | 12V DC Barrel Jack (+12V) | **RED** | **RED (Tested +12V)** | Soldered | DC Jack Center Pin Tab | Relay M1 Center Screw (COM1) | **VERIFIED (Active)** |
+| `PWR-2` | 12V DC Barrel Jack (GND) | **BLACK** | **BLACK (Tested GND)** | Soldered | DC Jack Sleeve Leaf Tab | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
+| `ACT-1a` | Pump Power Feed (NO1) | **GREEN** / Any | **GREEN** | Wire | Relay M1 Top Screw (NO1) | ACS712 Terminal [1] | **VERIFIED (Active)** |
+| `ACT-1b` | Pump Current Loop | Direct | **Pump (+) Wire** | Motor Lead | ACS712 Terminal [2] | Water Pump RED (+) Lead | **VERIFIED (Active)** |
+| `ACT-1c` | Pump Ground Return | **PURPLE** / Any | **PURPLE** | Wire | Water Pump BLACK (-) Lead | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
+| `ACT-2a` | Solenoid Switched Out (NO2) | **GREEN** / Any | **GREEN** | Wire | Relay M2 Top Screw (NO2) | FPD-270 Solenoid Terminal 1 | **VERIFIED (Active)** |
+| `ACT-2b` | Solenoid Ground Return | **GREY** / Any | **GREY** | Wire | FPD-270 Solenoid Terminal 2 | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
+| `ACT-3a` | Fan Switched Out (NO3) | **RED** | **Fan RED (+) Lead** | Motor Lead | Relay M3 Top Screw (NO3) | 5010 Fan (+) Lead | **VERIFIED (Active)** |
+| `ACT-3b` | Fan Ground Return | **PURPLE** / Any | **PURPLE** | Wire | 5010 Fan BLACK (-) Lead | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
+| `BUS-12V`| Relay +12V Daisy Chain | **GREEN** | **GREEN Jumpers** | M-M | Relay M1 COM ──> M2 COM ──> M3 COM | All Relay Centers | **VERIFIED (Active)** |
+| `VSENS-1`| Voltage Sensor VCC Screw | **RED** | **RED** | Wire | Voltage Sensor Terminal [VCC] | Relay M1 Center Screw (COM1) | **VERIFIED (Active)** |
+| `VSENS-2`| Voltage Sensor GND Screw | **GREEN** | **GREEN** | Wire | Voltage Sensor Terminal [GND] | Board A: Left Blue Rail (GND) | **VERIFIED (Active)** |
+| `TEST-1` | Live Power & Boot Test | **PASSED** | Dual-LED Boot Blink Confirmed | Firmware | ESP32 DevKit V1 | All Sensors & Relays | **OPERATIONAL & LIVE** |
+| `TEST-2` | 16x2 LCD Telemetry Display | **PASSED** | Level, Temp, Volts, Amps Active | I2C 0x27 | HD44780 + PCF8574 | Board B 3.3V Logic Bus | **OPERATIONAL & LIVE** |
+| `ACT-TEST`| 10-Second Actuator Full Sequence | **PASSED (100%)** | Pump Hum + Valve Thump + Fan Spin | 12V Live Bus | Relays M1, M2, M3 | 12.2V Load Switching Verified | **ALL SYSTEMS GO** |
+| `TEST-3` | Master Firmware Commissioning | **PASSED** | 115200 Baud JSON Telemetry Stream | USB Serial | scada_master_firmware | Level, Water Temp, Bus V, Interlocks | **ACTIVE & STREAMING** |
+| `TEST-4` | Gas Safety Interlock & Fan Reset | **PASSED** | Auto-trip >25% Gas, Auto-off when clear | GPIO 14 / GPIO 32 | MQ-2 + 5010 Fan | Hysteresis recovery verified | **OPERATIONAL** |
+
+---
+
+## 8. Current Bench Status & Next Session Plan
+
+### Verified Working Right Now:
+- **Compute & Telemetry**: ESP32 DevKit V1 flashing cleanly, streaming valid JSON telemetry at 115200 baud over USB serial.
+- **Actuators (12V Plant)**: Water pump, solenoid drain valve, and exhaust safety fan all switching cleanly via 4-channel active-LOW relay module.
+- **Water Level**: HC-SR04 ultrasonic rangefinder active and reading distance live.
+- **Water Temperature**: DS18B20 waterproof stainless probe reading live at 29.3°C.
+- **DC Bus Voltage**: 0–25V sensor reading live 12V bus at ~11.8V – 12.5V.
+- **Local HMI**: 16x2 LCD display running flicker-free, alternating between Page 1 and Page 2.
+- **Safety Interlocks**: Gas threshold trip with auto-exhaust fan latching and recovery.
+
+### To Finalize Next Session:
+1. **Physical Demonstration Rig Layout**:
+   - Arrange the dual-reservoir hydraulics (Water Tank + Sump/Reservoir), submersible pump, solenoid drain valve, and exhaust fan for clear camera and demonstration visibility.
+2. **Supervisory Integration & Live Demo**:
+   - Launch FastAPI backend bridge (`backend/`) and connect Web dashboard and LabVIEW station to the live JSON telemetry stream.
+
