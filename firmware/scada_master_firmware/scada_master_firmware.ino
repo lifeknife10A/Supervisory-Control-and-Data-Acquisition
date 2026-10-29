@@ -269,9 +269,9 @@ void setup() {
     lcd.backlight();
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("SCADA FAST AP");
+    lcd.print("SCADA AUTOMATION");
     lcd.setCursor(0, 1);
-    lcd.print("SSID: SCADA-EDGE");
+    lcd.print("PROCESS CONTROL ");
   }
 
   // Init DS18B20 with NON-BLOCKING conversion (crucial for streaming!)
@@ -296,9 +296,9 @@ void setup() {
   if (lcdFound) {
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("AP: SCADA-EDGE  ");
+    lcd.print("SCADA AUTOMATION");
     lcd.setCursor(0, 1);
-    lcd.print("IP: 192.168.4.1 ");
+    lcd.print("SYSTEM READY    ");
   }
 }
 
@@ -368,30 +368,43 @@ void loop() {
     ds18b20.requestTemperatures(); // Request next reading non-blocking
   }
 
-  // 4. Update LCD every 2.5 seconds (alternate page)
-  if (lcdFound && (millis() - lastDisplaySwitch > 3000)) {
+  // 4. Update LCD every 2.5 seconds (clean 3-page cyclic engineering telemetry display)
+  if (lcdFound && (millis() - lastDisplaySwitch > 2500)) {
     lastDisplaySwitch = millis();
-    displayPage = (displayPage + 1) % 2;
+    displayPage = (displayPage + 1) % 3;
 
     if (displayPage == 0) {
+      // Page 0: Primary Hydraulics & Thermal
       lcd.setCursor(0, 0);
       char line1[17];
-      snprintf(line1, sizeof(line1), "LVL:%3.0fcm T:%2.0fC ", currentLevelCm, currentWaterTempC);
+      snprintf(line1, sizeof(line1), "LEVEL:   %4.1f cm", currentLevelCm);
       lcd.print(line1);
 
       lcd.setCursor(0, 1);
       char line2[17];
-      snprintf(line2, sizeof(line2), "V:%4.1fV I:%4.2fA ", currentBusVolts, currentPumpAmps);
+      snprintf(line2, sizeof(line2), "TEMP:    %4.1f%cC ", currentWaterTempC, 0xDF);
+      lcd.print(line2);
+    } else if (displayPage == 1) {
+      // Page 1: Electrical Power & Current Flow
+      lcd.setCursor(0, 0);
+      char line1[17];
+      snprintf(line1, sizeof(line1), "VOLTAGE: %4.1f V ", currentBusVolts);
+      lcd.print(line1);
+
+      lcd.setCursor(0, 1);
+      char line2[17];
+      snprintf(line2, sizeof(line2), "CURRENT: %4.2f A ", currentPumpAmps);
       lcd.print(line2);
     } else {
+      // Page 2: Gas Hazard Level & Actuator States
       lcd.setCursor(0, 0);
       char line1[17];
-      snprintf(line1, sizeof(line1), "IP:192.168.4.1  ");
+      snprintf(line1, sizeof(line1), "GAS HAZARD: %2d%% ", currentGasPct);
       lcd.print(line1);
 
       lcd.setCursor(0, 1);
       char line2[17];
-      snprintf(line2, sizeof(line2), "GAS:%2d%% %s", currentGasPct, emergencyAlarm ? "ALARM TRP" : "SAFE ZONE");
+      snprintf(line2, sizeof(line2), "VALV:%-4s FAN:%-3s", valveState ? "OPEN" : "CLSD", fanState ? "ON " : "OFF");
       lcd.print(line2);
     }
   }
