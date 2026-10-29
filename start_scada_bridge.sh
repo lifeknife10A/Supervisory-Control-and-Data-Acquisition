@@ -6,4 +6,8 @@ echo "  Port: http://localhost:8000                            "
 echo "=========================================================="
 
 cd "$(dirname "$0")/backend"
-python3 server.py
+if [ -d ".venv" ]; then
+    .venv/bin/python server.py
+else
+    python3 server.py
+fi

@@ -150,17 +150,24 @@
 ## 8. Current Bench Status & Next Session Plan
 
 ### Verified Working Right Now:
-- **Compute & Telemetry**: ESP32 DevKit V1 flashing cleanly, streaming valid JSON telemetry at 115200 baud over USB serial.
+- **Compute & Telemetry**: ESP32 DevKit V1 flashing cleanly, streaming valid JSON telemetry at 115200 baud over USB serial and 4Hz Wi-Fi SoftAP at `192.168.4.1`.
 - **Actuators (12V Plant)**: Water pump, solenoid drain valve, and exhaust safety fan all switching cleanly via 4-channel active-LOW relay module.
 - **Water Level**: HC-SR04 ultrasonic rangefinder active and reading distance live.
 - **Water Temperature**: DS18B20 waterproof stainless probe reading live at 29.3°C.
 - **DC Bus Voltage**: 0–25V sensor reading live 12V bus at ~11.8V – 12.5V.
 - **Local HMI**: 16x2 LCD display running flicker-free, alternating between Page 1 and Page 2.
 - **Safety Interlocks**: Gas threshold trip with auto-exhaust fan latching and recovery.
+- **LabVIEW Master Supervisory Station (`Project Lab VIew.vi`)**:
+  - Dual-mode architecture: Simulation mode (internal physics + hysteresis) & Live Hardware mode (Wi-Fi HTTP GET to ESP32).
+  - Outgoing Web Bridge: Bundles all 7 core telemetry variables, serializes to JSON via `Flatten To JSON`, and streams at 2–4 Hz via `HTTP Client POST.vi` to `http://localhost:8000/api/telemetry`.
+  - `Web Bridge TX` annunciator dynamically reflects network health via HTTP error unbundling.
+  - Block diagram fully verified and clean.
+- **Backend & ML Suite**:
+  - FastAPI telemetry bridge (`server.py`) running with advisory ML models trained and loaded (Isolation Forest, 96.1% Fault Classifier, Pump Health RUL, MQ-2 Calibration, Trend Forecaster).
 
 ### To Finalize Next Session:
 1. **Physical Demonstration Rig Layout**:
    - Arrange the dual-reservoir hydraulics (Water Tank + Sump/Reservoir), submersible pump, solenoid drain valve, and exhaust fan for clear camera and demonstration visibility.
-2. **Supervisory Integration & Live Demo**:
-   - Launch FastAPI backend bridge (`backend/`) and connect Web dashboard and LabVIEW station to the live JSON telemetry stream.
+2. **Live Faculty Demonstration**:
+   - Demonstrate synchronized live telemetry streaming from physical ESP32 edge node to LabVIEW Master Station and Web Dashboard simultaneously.
 
