@@ -111,11 +111,9 @@ void calibrateCurrentZero() {
   float zero = readCurrentSensorVolts(256);
   if (zero > 1.5f && zero < 3.0f) {
     acs712ZeroV = zero;
-    Serial.printf("ACS712 zero calibrated: %.3f V
-", zero);
+    Serial.printf("ACS712 zero calibrated: %.3f V\n", zero);
   } else {
-    Serial.printf("ACS712 zero %.3f V implausible (sensor unplugged?), using %.2f V
-", zero, ACS712_NOMINAL_ZERO_V);
+    Serial.printf("ACS712 zero %.3f V implausible (sensor unplugged?), using %.2f V\n", zero, ACS712_NOMINAL_ZERO_V);
   }
 }
 
@@ -321,7 +319,7 @@ void loop() {
     if (pct > 100) pct = 100;
     currentGasPct = pct;
 
-    // Automated Safety Interlock
+    // Automated Safety Interlock (Gas Hazard & Exhaust Fan)
     if (currentGasVolts >= 1.2f) {
       if (!emergencyAlarm) {
         emergencyAlarm = true;
@@ -338,6 +336,27 @@ void loop() {
       }
       digitalWrite(PIN_LED_RED, LOW);
       digitalWrite(PIN_LED_GREEN, (millis() / 500) % 2);
+    }
+
+    // Automated Autonomous Overflow Interlock (High Water Level -> Open Solenoid Drain Valve)
+    // When water rises to within 6.0 cm of sensor (High Water Trip):
+    if (currentLevelCm > 1.0f && currentLevelCm <= 6.0f) {
+      if (!valveState) {
+        valveState = true;
+        digitalWrite(PIN_RELAY_VALVE, LOW); // Active-LOW: Solenoid Valve OPEN
+        Serial.println(F("[INTERLOCK] High Water Level Trip! Solenoid Drain Valve OPEN"));
+      }
+      if (pumpState) {
+        pumpState = false;
+        digitalWrite(PIN_RELAY_PUMP, HIGH); // Interlock: Inhibit pump on high water
+      }
+    } else if (currentLevelCm >= 10.0f) {
+      // When water drains back down past 10.0 cm (Safe Reset Level):
+      if (valveState) {
+        valveState = false;
+        digitalWrite(PIN_RELAY_VALVE, HIGH); // Active-LOW: Solenoid Valve CLOSED
+        Serial.println(F("[INTERLOCK] Water Level Normal. Solenoid Drain Valve CLOSED"));
+      }
     }
   }
 
