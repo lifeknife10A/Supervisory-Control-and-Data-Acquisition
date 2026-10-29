@@ -13,10 +13,11 @@ import { DestructiveConfirmModal } from './components/ui/DestructiveConfirmModal
 import { CircuitSimulationDashboard } from './components/ui/CircuitSimulationDashboard';
 import { PredictiveAnalyticsPanel } from './components/ui/PredictiveAnalyticsPanel';
 import { MLAlertToaster } from './components/ui/MLAlertToaster';
+import { PlantDashboard } from './components/ui/PlantDashboard';
 import { useWorkbenchStore } from './store/workbenchStore';
 import { useBackendPredictions } from './hooks/useBackendPredictions';
 import { BACKEND_URL } from './constants/backend';
-import { Layers, HelpCircle, Cable, RotateCw, Activity, ShieldCheck, Box, ArrowUp, ArrowDown, BrainCircuit } from 'lucide-react';
+import { Layers, HelpCircle, Cable, RotateCw, Activity, ShieldCheck, Box, ArrowUp, ArrowDown, BrainCircuit, LayoutDashboard } from 'lucide-react';
 
 export function App() {
   const isSerialMonitorOpen = useWorkbenchStore((s) => s.isSerialMonitorOpen);
@@ -24,6 +25,7 @@ export function App() {
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [showCircuitDashboard, setShowCircuitDashboard] = useState(false);
   const [showPredictive, setShowPredictive] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   // Always polled so alerts pop up whichever panel is open; event history only while visible.
   const backend = useBackendPredictions(showPredictive);
 
@@ -164,6 +166,7 @@ export function App() {
         onTogglePredictive={togglePredictive}
         showPredictive={predictiveVisible}
         activeAlertCount={backend.alerts.length}
+        onOpenDashboard={() => setShowDashboard(true)}
       />
 
       {/* 3. Right Component Catalog (Collapsible Drawer with drag-and-drop) */}
@@ -183,6 +186,7 @@ export function App() {
 
       {/* 6c. Predictive Analytics (bridge ML) on Right + alert toasts everywhere */}
       {predictiveVisible && <PredictiveAnalyticsPanel data={backend} onClose={() => setShowPredictive(false)} />}
+      {showDashboard && <PlantDashboard onClose={() => setShowDashboard(false)} />}
       <MLAlertToaster alerts={backend.alerts} onOpenPanel={() => !predictiveVisible && togglePredictive()} />
 
       {/* 7. ESP32 Firmware & Serial Studio Modal */}
@@ -387,6 +391,14 @@ export function App() {
         >
           <Activity className="w-4 h-4" />
           <span className="text-[10px] font-medium">Simulation</span>
+        </button>
+
+        <button
+          onClick={() => setShowDashboard(true)}
+          className="flex flex-col items-center space-y-0.5 text-slate-600 hover:text-sky-600"
+        >
+          <LayoutDashboard className="w-4 h-4" />
+          <span className="text-[10px] font-medium">Dashboard</span>
         </button>
 
         <button

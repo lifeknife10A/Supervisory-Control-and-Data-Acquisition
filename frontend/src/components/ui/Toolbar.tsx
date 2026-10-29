@@ -16,7 +16,8 @@ import {
   Cpu,
   Zap,
   Activity,
-  BrainCircuit
+  BrainCircuit,
+  LayoutDashboard
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/workbenchStore';
 
@@ -44,6 +45,7 @@ interface ToolbarProps {
   onTogglePredictive?: () => void;
   showPredictive?: boolean;
   activeAlertCount?: number;
+  onOpenDashboard?: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -54,7 +56,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   showCircuitDashboard,
   onTogglePredictive,
   showPredictive,
-  activeAlertCount = 0
+  activeAlertCount = 0,
+  onOpenDashboard
 }) => {
   const selectedComponentIds = useWorkbenchStore((s) => s.selectedComponentIds);
   const rotateSelectedComponent = useWorkbenchStore((s) => s.rotateSelectedComponent);
@@ -506,6 +509,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             >
               <Zap className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Circuit</span>
+            </button>
+          )}
+
+          {/* Plant Dashboard: per-device live vitals and manual actuation */}
+          {onOpenDashboard && (
+            <button
+              onClick={onOpenDashboard}
+              title="Open the Plant Dashboard (live sensor vitals and manual actuator control)"
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition font-medium text-gray-600 hover:bg-gray-100 border-gray-200"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Dashboard</span>
             </button>
           )}
 
